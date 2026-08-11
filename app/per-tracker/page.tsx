@@ -17,9 +17,11 @@ export default async function PerTrackerPage() {
     .single();
 
   const { data: objectives } = await supabase
-    .from("per_objectives")
-    .select("objective_number, status, evidence_notes, submitted_at, approved_at")
-    .eq("user_id", user.id);
+  .from("per_objectives")
+  .select(
+    "id, objective_number, title, status, evidence_notes, submitted_at, approved_at, approved_by"
+  )
+  .eq("user_id", user.id);
 
   const existingByNumber = Object.fromEntries(
     (objectives ?? []).map((o) => [o.objective_number, o])

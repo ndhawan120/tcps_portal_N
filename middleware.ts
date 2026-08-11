@@ -73,6 +73,11 @@ export async function middleware(request: NextRequest) {
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
+    if (path.startsWith("/employee/") && role !== "manager" && role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

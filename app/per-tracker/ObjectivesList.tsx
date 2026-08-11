@@ -16,9 +16,11 @@ type ExistingRow = {
 export default function ObjectivesList({
   userId,
   existingByNumber,
+  readOnly = false,
 }: {
   userId: string;
   existingByNumber: Record<number, ExistingRow>;
+  readOnly?: boolean;
 }) {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant">
@@ -31,6 +33,7 @@ export default function ObjectivesList({
           category={obj.category}
           essential={obj.essential}
           existing={existingByNumber[obj.number]}
+          readOnly={readOnly}
         />
       ))}
     </div>
@@ -44,6 +47,7 @@ function ObjectiveRow({
   category,
   essential,
   existing,
+  readOnly,
 }: {
   userId: string;
   number: number;
@@ -51,47 +55,43 @@ function ObjectiveRow({
   category: string;
   essential: boolean;
   existing?: ExistingRow;
+  readOnly: boolean;
 }) {
   const status = existing?.status ?? "not_started";
   const [notes, setNotes] = useState(existing?.evidence_notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
-  const editable = status === "not_started" || status === "draft" || status === "rejected";
+  const editable =
+    !readOnly &&
+    (status === "not_started" || status === "draft" || status === "rejected");
 
-  const saveDraft = async () => {
+  const runUpsert = async (extra: Record<string, unknown>) => {
     setSaving(true);
-    await supabase.from("per_objectives").upsert(
+    setError(null);
+    const { error } = await supabase.from("per_objectives").upsert(
       {
         user_id: userId,
         objective_number: number,
         title,
         evidence_notes: notes || null,
-        status: "draft",
+        ...extra,
       },
       { onConflict: "user_id,objective_number" }
     );
     setSaving(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
     router.refresh();
   };
 
-  const submit = async () => {
-    setSaving(true);
-    await supabase.from("per_objectives").upsert(
-      {
-        user_id: userId,
-        objective_number: number,
-        title,
-        evidence_notes: notes || null,
-        status: "pending_approval",
-        submitted_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,objective_number" }
-    );
-    setSaving(false);
-    router.refresh();
-  };
+  const saveDraft = () => runUpsert({ status: "draft" });
+  const submit = () =>
+    runUpsert({ status: "pending_approval", submitted_at: new Date().toISOString() });
 
   return (
     <div className="p-5">
@@ -159,6 +159,12 @@ function ObjectiveRow({
         existing?.evidence_notes && (
           <p className="mt-2 text-xs text-on-surface-variant">{existing.evidence_notes}</p>
         )
+      )}
+
+      {error && (
+        <p className="mt-2 text-xs text-error bg-error-container/40 border border-error/30 rounded-md px-2 py-1.5">
+          Couldn&apos;t save: {error}
+        </p>
       )}
     </div>
   );

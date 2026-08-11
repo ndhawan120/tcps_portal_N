@@ -1,11 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import Nav from "@/components/Nav";
 import RoleSelect from "./RoleSelect";
 import DepartmentSelect from "./DepartmentSelect";
 import StatusSelect from "./StatusSelect";
 import ManagerSelect from "./ManagerSelect";
 import AddUserModal from "./AddUserModal";
+
+const TOTAL_OBJECTIVES = 22;
+const TOTAL_EXAMS = 13;
 
 export default async function AdminPage() {
   const supabase = createClient();
@@ -29,9 +33,17 @@ export default async function AdminPage() {
     .from("per_objectives")
     .select("status");
 
-  const total = allObjectives?.length ?? 0;
-  const approved = allObjectives?.filter((o) => o.status === "approved").length ?? 0;
-  const globalProgress = total > 0 ? Math.round((approved / total) * 100) : 0;
+  const { data: allExams } = await supabase.from("exams").select("status");
+
+  const approvedCount = allObjectives?.filter((o) => o.status === "approved").length ?? 0;
+  const passedCount = allExams?.filter((e) => e.status === "passed").length ?? 0;
+  const userCount = allUsers?.length ?? 1;
+  const globalObjectiveProgress = Math.round(
+    (approvedCount / (userCount * TOTAL_OBJECTIVES)) * 100
+  );
+  const globalExamProgress = Math.round(
+    (passedCount / (userCount * TOTAL_EXAMS)) * 100
+  );
 
   const managers = (allUsers ?? []).filter(
     (u) => u.role === "manager" || u.role === "admin"
@@ -46,8 +58,10 @@ export default async function AdminPage() {
           <AddUserModal />
         </div>
         <p className="text-sm text-on-surface-variant mb-8">
-          Global progress across all users:{" "}
-          <span className="font-semibold text-primary">{globalProgress}%</span>
+          Company-wide PER progress:{" "}
+          <span className="font-semibold text-primary">{globalObjectiveProgress}%</span>
+          {" · "}Exam pass rate:{" "}
+          <span className="font-semibold text-primary">{globalExamProgress}%</span>
         </p>
 
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
@@ -64,6 +78,7 @@ export default async function AdminPage() {
                   <th className="text-left px-5 py-3">Role</th>
                   <th className="text-left px-5 py-3">Manager</th>
                   <th className="text-left px-5 py-3">Status</th>
+                  <th className="text-left px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
@@ -90,6 +105,16 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-5 py-3">
                       <StatusSelect userId={u.id} currentStatus={u.status} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {u.id !== user.id && (
+                        <Link
+                          href={`/employee/${u.id}`}
+                          className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
+                        >
+                          View details →
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}

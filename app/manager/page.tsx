@@ -3,9 +3,24 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import ApproveButton from "./ApproveButton";
+import StatusBars from "@/components/StatusBars";
 
 const TOTAL_OBJECTIVES = 22;
 const TOTAL_EXAMS = 13;
+const PER_STATUSES = [
+  { key: "not_started", label: "Not Started", tone: "neutral" as const },
+  { key: "draft", label: "Draft", tone: "primary" as const },
+  { key: "pending_approval", label: "Pending Approval", tone: "warning" as const },
+  { key: "approved", label: "Approved", tone: "success" as const },
+  { key: "rejected", label: "Rejected", tone: "danger" as const },
+];
+const EXAM_STATUSES = [
+  { key: "not_started", label: "Not Started", tone: "neutral" as const },
+  { key: "in_progress", label: "In Progress", tone: "primary" as const },
+  { key: "scheduled", label: "Scheduled", tone: "warning" as const },
+  { key: "passed", label: "Passed", tone: "success" as const },
+  { key: "failed", label: "Failed", tone: "danger" as const },
+];
 
 export default async function ManagerPage() {
   const supabase = createClient();
@@ -22,7 +37,6 @@ export default async function ManagerPage() {
 
   const isAdmin = profile?.role === "admin";
 
-  // Admins see the whole company; managers see only their direct reports.
   const teamQuery = isAdmin
     ? supabase.from("profiles").select("*").neq("id", user.id)
     : supabase.from("profiles").select("*").eq("manager_id", user.id);
@@ -42,17 +56,13 @@ export default async function ManagerPage() {
         .in("user_id", teamIds)
         .eq("status", "pending_approval")
     : null;
-
-  const { data: pending } = pendingQuery
-    ? await pendingQuery
-    : { data: [] };
+  const { data: pending } = pendingQuery ? await pendingQuery : { data: [] };
 
   const objectivesQuery = isAdmin
     ? supabase.from("per_objectives").select("user_id,status")
     : teamIds.length
     ? supabase.from("per_objectives").select("user_id,status").in("user_id", teamIds)
     : null;
-
   const { data: allObjectives } = objectivesQuery
     ? await objectivesQuery
     : { data: [] };
@@ -62,8 +72,18 @@ export default async function ManagerPage() {
     : teamIds.length
     ? supabase.from("exams").select("user_id,status").in("user_id", teamIds)
     : null;
-
   const { data: allExams } = examsQuery ? await examsQuery : { data: [] };
+
+  const objectiveCounts = PER_STATUSES.map((item) => ({
+    label: item.label,
+    count: (allObjectives ?? []).filter((row) => row.status === item.key).length,
+    tone: item.tone,
+  }));
+  const examCounts = EXAM_STATUSES.map((item) => ({
+    label: item.label,
+    count: (allExams ?? []).filter((row) => row.status === item.key).length,
+    tone: item.tone,
+  }));
 
   const progressByUser: Record<string, { approved: number }> = {};
   (allObjectives ?? []).forEach((o) => {
@@ -93,23 +113,34 @@ export default async function ManagerPage() {
       <Nav role={profile?.role ?? "manager"} name={`${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`} />
       <main className="max-w-6xl mx-auto px-6 py-8">
         <h1 className="text-2xl font-bold text-on-surface mb-1">
-          {isAdmin ? "Everyone's Progress" : "Team Overview"}
+          {isAdmin ? "Everyone&apos;s Progress" : "Team Overview"}
         </h1>
         <p className="text-sm text-on-surface-variant mb-8">
           {isAdmin
-            ? "As an admin you see every user, not just your own direct reports. "
-            : ""}
-          Average progress: <span className="font-semibold text-primary">{avgProgress}%</span>
+            ? "Company-wide PER and exam status across all employees."
+            : "Overall progress and approval status for your direct reports."}{" "}
+          Average PER progress: <span className="font-semibold text-primary">{avgProgress}%</span>
         </p>
 
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl mb-8">
-          <h2 className="text-lg font-bold text-on-surface px-5 pt-5 pb-3">
-            Pending PER Approvals
-          </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <StatusBars title="PER Objectives Status" items={objectiveCounts} />
+          <StatusBars title="Exam Status" items={examCounts} />
+        </div>
+
+        <section className="bg-surface-container-lowest border border-outline-variant rounded-xl mb-8">
+          <div className="flex items-center justify-between px-5 pt-5 pb-3">
+            <div>
+              <h2 className="text-lg font-bold text-on-surface">Pending PER Approvals</h2>
+              <p className="text-xs text-on-surface-variant mt-1">{pending?.length ?? 0} request(s) waiting for a decision.</p>
+            </div>
+            <Link href="/manager/approvals" className="text-xs font-medium text-primary hover:underline">
+              Open approvals →
+            </Link>
+          </div>
           <div className="divide-y divide-outline-variant">
             {(pending ?? []).map((p: any) => (
-              <div key={p.id} className="px-5 py-3 flex items-center justify-between">
-                <div>
+              <div key={p.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-on-surface">
                     {p.profiles?.first_name} {p.profiles?.last_name} — Objective {p.objective_number}: {p.title}
                   </p>
@@ -121,63 +152,54 @@ export default async function ManagerPage() {
               </div>
             ))}
             {(!pending || pending.length === 0) && (
-              <p className="px-5 py-4 text-sm text-on-surface-variant">
-                No approvals pending right now.
-              </p>
+              <p className="px-5 py-4 text-sm text-on-surface-variant">No approvals pending right now.</p>
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl">
+        <section className="bg-surface-container-lowest border border-outline-variant rounded-xl">
           <h2 className="text-lg font-bold text-on-surface px-5 pt-5 pb-3">
             {isAdmin ? "Everyone" : "Team"}
           </h2>
-          <table className="w-full text-sm">
-            <thead className="bg-surface-container text-on-surface-variant text-xs uppercase font-semibold">
-              <tr>
-                <th className="text-left px-5 py-3">Name</th>
-                <th className="text-left px-5 py-3">PER Progress</th>
-                <th className="text-left px-5 py-3">Exams Passed</th>
-                <th className="text-left px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant">
-              {(team ?? []).map((t) => {
-                const p = progressByUser[t.id];
-                const pct = Math.round(((p?.approved ?? 0) / TOTAL_OBJECTIVES) * 100);
-                const passed = examsPassedByUser[t.id] ?? 0;
-                return (
-                  <tr key={t.id}>
-                    <td className="px-5 py-3 font-medium text-on-surface">
-                      {t.first_name} {t.last_name}
-                    </td>
-                    <td className="px-5 py-3 text-on-surface-variant">
-                      {p?.approved ?? 0}/{TOTAL_OBJECTIVES} ({pct}%)
-                    </td>
-                    <td className="px-5 py-3 text-on-surface-variant">
-                      {passed}/{TOTAL_EXAMS}
-                    </td>
-                    <td className="px-5 py-3">
-                      <Link
-                        href={`/employee/${t.id}`}
-                        className="text-xs font-medium text-primary hover:underline"
-                      >
-                        View details →
-                      </Link>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-container text-on-surface-variant text-xs uppercase font-semibold">
+                <tr>
+                  <th className="text-left px-5 py-3">Name</th>
+                  <th className="text-left px-5 py-3">PER Progress</th>
+                  <th className="text-left px-5 py-3">Exams Passed</th>
+                  <th className="text-left px-5 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {(team ?? []).map((t) => {
+                  const p = progressByUser[t.id];
+                  const pct = Math.round(((p?.approved ?? 0) / TOTAL_OBJECTIVES) * 100);
+                  const passed = examsPassedByUser[t.id] ?? 0;
+                  return (
+                    <tr key={t.id}>
+                      <td className="px-5 py-3 font-medium text-on-surface">{t.first_name} {t.last_name}</td>
+                      <td className="px-5 py-3 text-on-surface-variant">{p?.approved ?? 0}/{TOTAL_OBJECTIVES} ({pct}%)</td>
+                      <td className="px-5 py-3 text-on-surface-variant">{passed}/{TOTAL_EXAMS}</td>
+                      <td className="px-5 py-3">
+                        <Link href={`/employee/${t.id}`} className="text-xs font-medium text-primary hover:underline">
+                          View details →
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {(!team || team.length === 0) && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-6 text-center text-on-surface-variant">
+                      {isAdmin ? "No other users yet." : "No direct reports assigned yet."}
                     </td>
                   </tr>
-                );
-              })}
-              {(!team || team.length === 0) && (
-                <tr>
-                  <td colSpan={4} className="px-5 py-6 text-center text-on-surface-variant">
-                    {isAdmin ? "No other users yet." : "No direct reports assigned yet."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </main>
     </div>
   );

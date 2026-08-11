@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
-import StatusPill from "@/components/StatusPill";
+import AddExamModal from "./AddExamModal";
+import EditExamRow from "./EditExamRow";
 
 export default async function ExamsPage() {
   const supabase = createClient();
@@ -26,7 +27,10 @@ export default async function ExamsPage() {
     <div>
       <Nav role={profile?.role ?? "employee"} name={`${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`} />
       <main className="max-w-6xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-on-surface mb-6">ACCA Exam Tracker</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-on-surface">ACCA Exam Tracker</h1>
+          <AddExamModal userId={user.id} />
+        </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -34,9 +38,8 @@ export default async function ExamsPage() {
               <tr>
                 <th className="text-left px-5 py-3">Exam Module</th>
                 <th className="text-left px-5 py-3">Level</th>
-                <th className="text-left px-5 py-3">Status</th>
                 <th className="text-left px-5 py-3">Next Sitting</th>
-                <th className="text-left px-5 py-3">Result</th>
+                <th className="text-left px-5 py-3">Status &amp; Result</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
@@ -46,23 +49,24 @@ export default async function ExamsPage() {
                     {e.exam_module}
                   </td>
                   <td className="px-5 py-3 text-on-surface-variant">{e.level}</td>
-                  <td className="px-5 py-3">
-                    <StatusPill status={e.status} />
-                  </td>
                   <td className="px-5 py-3 text-on-surface-variant">
                     {e.next_sitting
                       ? new Date(e.next_sitting).toLocaleDateString()
                       : "—"}
                   </td>
-                  <td className="px-5 py-3 text-on-surface-variant">
-                    {e.result ?? "—"}
+                  <td className="px-5 py-3">
+                    <EditExamRow
+                      examId={e.id}
+                      currentStatus={e.status}
+                      currentResult={e.result}
+                    />
                   </td>
                 </tr>
               ))}
               {(!exams || exams.length === 0) && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">
-                    No exams recorded yet.
+                  <td colSpan={4} className="px-5 py-6 text-center text-on-surface-variant">
+                    No exams recorded yet. Click &quot;+ Add Exam&quot; to add your first one.
                   </td>
                 </tr>
               )}

@@ -31,7 +31,8 @@ create table if not exists per_objectives (
   approved_at timestamptz,
   approved_by uuid references profiles(id),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (user_id, objective_number)
 );
 
 -- 3. EXAMS (ACCA exam module tracker)

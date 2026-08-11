@@ -50,7 +50,8 @@ create table if not exists exams (
   next_sitting date,
   result text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (user_id, exam_module)
 );
 
 -- 4. APPROVAL HISTORY (audit trail for manager decisions on PER objectives)
@@ -63,13 +64,19 @@ create table if not exists approval_history (
   created_at timestamptz not null default now()
 );
 
--- ============================================================
--- Row Level Security
--- ============================================================
+-- 5. ANNOUNCEMENTS (management updates/news visible to everyone)
+create table if not exists announcements (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references profiles(id) on delete cascade,
+  title text not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
 alter table profiles enable row level security;
 alter table per_objectives enable row level security;
 alter table exams enable row level security;
 alter table approval_history enable row level security;
+alter table announcements enable row level security;
 
 -- Helper: current user's role
 create or replace function current_role_name() returns text as $$
@@ -110,6 +117,16 @@ create policy "Managers view + write team history" on approval_history for all
   ));
 create policy "Admins manage all history" on approval_history for all
   using (current_role_name() = 'admin');
+
+-- ANNOUNCEMENTS policies
+create policy "Everyone signed in can view announcements" on announcements
+  for select using (auth.uid() is not null);
+create policy "Managers and admins can post announcements" on announcements
+  for insert with check (current_role_name() in ('manager', 'admin'));
+create policy "Authors can delete their own announcements" on announcements
+  for delete using (auth.uid() = author_id);
+create policy "Admins can delete any announcement" on announcements
+  for delete using (current_role_name() = 'admin');
 
 -- ============================================================
 -- Auto-create a profile row whenever a new auth user signs up

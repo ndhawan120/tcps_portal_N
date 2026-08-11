@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
 import ApproveButton from "./ApproveButton";
 
+const TOTAL_OBJECTIVES = 22;
+
 export default async function ManagerPage() {
   const supabase = createClient();
   const {
@@ -35,10 +37,9 @@ export default async function ManagerPage() {
     ? await supabase.from("per_objectives").select("user_id,status").in("user_id", teamIds)
     : { data: [] };
 
-  const progressByUser: Record<string, { total: number; approved: number }> = {};
+  const progressByUser: Record<string, { approved: number }> = {};
   (allObjectives ?? []).forEach((o) => {
-    progressByUser[o.user_id] ??= { total: 0, approved: 0 };
-    progressByUser[o.user_id].total += 1;
+    progressByUser[o.user_id] ??= { approved: 0 };
     if (o.status === "approved") progressByUser[o.user_id].approved += 1;
   });
 
@@ -47,7 +48,7 @@ export default async function ManagerPage() {
       ? Math.round(
           (team ?? []).reduce((sum, t) => {
             const p = progressByUser[t.id];
-            return sum + (p && p.total > 0 ? (p.approved / p.total) * 100 : 0);
+            return sum + ((p?.approved ?? 0) / TOTAL_OBJECTIVES) * 100;
           }, 0) / (team ?? []).length
         )
       : 0;
@@ -99,7 +100,7 @@ export default async function ManagerPage() {
             <tbody className="divide-y divide-outline-variant">
               {(team ?? []).map((t) => {
                 const p = progressByUser[t.id];
-                const pct = p && p.total > 0 ? Math.round((p.approved / p.total) * 100) : 0;
+                const pct = Math.round(((p?.approved ?? 0) / TOTAL_OBJECTIVES) * 100);
                 return (
                   <tr key={t.id}>
                     <td className="px-5 py-3 font-medium text-on-surface">

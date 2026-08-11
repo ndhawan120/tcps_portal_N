@@ -24,6 +24,7 @@ export default function Nav({
     { href: "/dashboard", label: "Dashboard" },
     { href: "/per-tracker", label: "PER Objectives" },
     { href: "/exams", label: "Exams" },
+    { href: "/announcements", label: "Updates" },
   ];
   if (role === "manager" || role === "admin") {
     links.push({ href: "/manager", label: "Team" });

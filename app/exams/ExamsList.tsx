@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import StatusPill from "@/components/StatusPill";
+import { createClient } from "@/lib/supabase/client";
 import { ACCA_EXAMS } from "@/lib/accaExams";
 
 const STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"] as const;
+const RESULTS = ["pass", "fail", "exempt"] as const;
 
 type ExistingRow = {
   status: string;
@@ -132,7 +133,7 @@ function ExamRow({
             <span className="text-xs text-on-surface-variant">
               {nextSitting ? new Date(nextSitting).toLocaleDateString() : "—"}
             </span>
-            <span className="text-xs text-on-surface-variant w-16">
+            <span className="text-xs text-on-surface-variant w-16 capitalize">
               {result || "—"}
             </span>
           </>
@@ -141,10 +142,12 @@ function ExamRow({
             <select
               value={status}
               onChange={(e) => {
-                setStatus(e.target.value);
-                upsertExam({ status: e.target.value });
+                const nextStatus = e.target.value;
+                setStatus(nextStatus);
+                upsertExam({ status: nextStatus });
               }}
               className="text-xs border border-outline-variant rounded-md px-2 py-1.5 bg-surface-container-lowest capitalize"
+              aria-label={`${name} status`}
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -159,16 +162,26 @@ function ExamRow({
               onChange={(e) => setNextSitting(e.target.value)}
               onBlur={() => upsertExam({ next_sitting: nextSitting || null })}
               className="text-xs border border-outline-variant rounded-md px-2 py-1.5"
+              aria-label={`${name} next sitting`}
             />
 
-            <input
-              type="text"
-              placeholder="Result"
-              value={result ?? ""}
-              onChange={(e) => setResult(e.target.value)}
-              onBlur={() => upsertExam({ result: result || null })}
-              className="text-xs border border-outline-variant rounded-md px-2 py-1.5 w-24"
-            />
+            <select
+              value={result}
+              onChange={(e) => {
+                const nextResult = e.target.value;
+                setResult(nextResult);
+                upsertExam({ result: nextResult || null });
+              }}
+              className="text-xs border border-outline-variant rounded-md px-2 py-1.5 bg-surface-container-lowest capitalize"
+              aria-label={`${name} result`}
+            >
+              <option value="">Result</option>
+              {RESULTS.map((r) => (
+                <option key={r} value={r}>
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </option>
+              ))}
+            </select>
           </>
         )}
 

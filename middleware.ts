@@ -40,13 +40,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Role-gate manager and admin sections
-  if (user && (path.startsWith("/manager") || path.startsWith("/admin"))) {
+  // Role-gate manager and admin sections, and block inactive users
+  if (user && !isPublic) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, status")
       .eq("id", user.id)
       .single();
+
+    if (profile?.status === "inactive") {
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "account_inactive");
+      return NextResponse.redirect(url);
+    }
 
     const role = profile?.role;
     if (path.startsWith("/admin") && role !== "admin") {

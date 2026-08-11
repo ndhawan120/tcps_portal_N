@@ -115,7 +115,7 @@ create policy "Admins manage all history" on approval_history for all
 -- ============================================================
 create or replace function handle_new_user() returns trigger as $$
 begin
-  insert into profiles (id, first_name, last_name, email)
+  insert into public.profiles (id, first_name, last_name, email)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'first_name', 'New'),
@@ -124,7 +124,7 @@ begin
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

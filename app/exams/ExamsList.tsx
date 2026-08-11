@@ -7,11 +7,26 @@ import StatusPill from "@/components/StatusPill";
 import { ACCA_EXAMS } from "@/lib/accaExams";
 
 const STATUSES = [
-  "not_started",
-  "in_progress",
-  "scheduled",
-  "passed",
-  "failed",
+  {
+    value: "not_started",
+    label: "Not Started",
+  },
+  {
+    value: "in_progress",
+    label: "In Progress",
+  },
+  {
+    value: "scheduled",
+    label: "Scheduled",
+  },
+  {
+    value: "passed",
+    label: "Passed",
+  },
+  {
+    value: "failed",
+    label: "Failed",
+  },
 ] as const;
 
 const RESULTS = [
@@ -34,7 +49,10 @@ const RESULTS = [
 ] as const;
 
 type ExistingRow = {
+  id?: string;
+  level?: string;
   status: string;
+  exam_date?: string | null;
   next_sitting: string | null;
   result: string | null;
 };
@@ -50,22 +68,26 @@ export default function ExamsList({
 }) {
   const grouped = ACCA_EXAMS.reduce<Record<string, typeof ACCA_EXAMS>>(
     (acc, exam) => {
-      acc[exam.level] ??= [];
+      if (!acc[exam.level]) {
+        acc[exam.level] = [];
+      }
+
       acc[exam.level].push(exam);
+
       return acc;
     },
     {}
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {Object.entries(grouped).map(([level, exams]) => (
         <div key={level}>
-          <h2 className="text-sm font-bold text-on-surface-variant uppercase tracking-wide mb-2">
+          <h2 className="text-sm font-bold text-on-surface-variant uppercase tracking-wide mb-3">
             {level}
           </h2>
 
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden">
             {exams.map((exam) => (
               <ExamRow
                 key={exam.code}
@@ -85,7 +107,9 @@ export default function ExamsList({
 }
 
 function getExamLevel(name: string): string {
-  const found = ACCA_EXAMS.find((exam) => exam.name === name);
+  const found = ACCA_EXAMS.find(
+    (exam) => exam.name === name
+  );
 
   return found?.level ?? "Applied Knowledge";
 }
@@ -124,7 +148,13 @@ function ExamRow({
   const router = useRouter();
   const supabase = createClient();
 
-  const upsertExam = async (patch: {
+  /*
+   * =========================================================
+   * SAVE EXAM
+   * =========================================================
+   */
+
+  const saveExam = async (patch: {
     status?: string;
     next_sitting?: string | null;
     result?: string | null;
@@ -150,53 +180,171 @@ function ExamRow({
           : result || null,
     };
 
-    const { error: upsertError } = await supabase
-      .from("exams")
-      .upsert(payload, {
-        onConflict: "user_id,exam_module",
-      });
+    try {
+      /*
+       * -------------------------------------------------------
+       * If an existing row already exists, UPDATE it.
+       *
+       * This avoids relying on ON CONFLICT and therefore avoids
+       * the unique-constraint error you were getting.
+       * -------------------------------------------------------
+       */
 
-    setSaving(false);
+      if (existing?.id) {
+        const { error: updateError } = await supabase
+          .from("exams")
+          .update(payload)
+          .eq("id", existing.id)
+          .eq("user_id", userId);
 
-    if (upsertError) {
-      console.error("Exam update failed:", upsertError);
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+      } else {
+        /*
+         * -----------------------------------------------------
+         * No existing record yet.
+         *
+         * First check whether one already exists for this
+         * employee + exam module.
+         * -----------------------------------------------------
+         */
+
+        const { data: existingExam, error: lookupError } =
+          await supabase
+            .from("exams")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("exam_module", name)
+            .maybeSingle();
+
+        if (lookupError) {
+          throw new Error(lookupError.message);
+        }
+
+        if (existingExam?.id) {
+          const { error: updateError } = await supabase
+            .from("exams")
+            .update(payload)
+            .eq("id", existingExam.id)
+            .eq("user_id", userId);
+
+          if (updateError) {
+            throw new Error(updateError.message);
+          }
+        } else {
+          const { error: insertError } = await supabase
+            .from("exams")
+            .insert(payload);
+
+          if (insertError) {
+            throw new Error(insertError.message);
+          }
+        }
+      }
+
+      setSuccess("Saved successfully.");
+
+      /*
+       * Refresh server data so the page and dashboard stay
+       * synchronized.
+       */
+
+      router.refresh();
+    } catch (saveError) {
+      console.error("Exam update failed:", saveError);
 
       setError(
-        upsertError.message ||
-          "Unable to save the exam information."
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save exam information."
       );
-
-      return;
+    } finally {
+      setSaving(false);
     }
+  };
 
-    setSuccess("Saved successfully.");
+  /*
+   * =========================================================
+   * STATUS CHANGE
+   * =========================================================
+   */
 
-    router.refresh();
+  const handleStatusChange = (
+    newStatus: string
+  ) => {
+    setStatus(newStatus);
+
+    saveExam({
+      status: newStatus,
+    });
+  };
+
+  /*
+   * =========================================================
+   * RESULT CHANGE
+   * =========================================================
+   */
+
+  const handleResultChange = (
+    newResult: string
+  ) => {
+    setResult(newResult);
+
+    saveExam({
+      result: newResult || null,
+    });
+  };
+
+  /*
+   * =========================================================
+   * NEXT SITTING CHANGE
+   * =========================================================
+   */
+
+  const handleNextSittingChange = (
+    newDate: string
+  ) => {
+    setNextSitting(newDate);
+  };
+
+  /*
+   * Save date after user leaves the field.
+   */
+
+  const handleNextSittingBlur = () => {
+    saveExam({
+      next_sitting: nextSitting || null,
+    });
   };
 
   const applied = status !== "not_started";
 
   return (
-    <div className="p-4">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+    <div className="p-5">
+      <div className="flex flex-col xl:flex-row xl:items-center gap-4">
 
         {/* =====================================================
             EXAM NAME
         ===================================================== */}
 
-        <div className="flex-1 min-w-[220px]">
-          <p className="text-sm font-medium text-on-surface">
-            {code} — {name}
+        <div className="flex-1 min-w-[240px]">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-on-surface">
+              {code} — {name}
+            </p>
 
             {optional && (
-              <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">
                 Optional
               </span>
             )}
-          </p>
+          </div>
 
-          <p className="text-xs text-on-surface-variant mt-0.5">
-            {applied ? "Applied" : "Not applied yet"}
+          <p className="text-xs text-on-surface-variant mt-1">
+            {applied
+              ? "Exam information entered"
+              : "Not started"}
           </p>
         </div>
 
@@ -205,86 +353,116 @@ function ExamRow({
         ===================================================== */}
 
         {readOnly ? (
-          <>
-            <span className="text-xs text-on-surface-variant">
-              {nextSitting
-                ? new Date(nextSitting).toLocaleDateString()
-                : "—"}
-            </span>
+          <div className="flex flex-wrap items-center gap-4">
+            <div>
+              <p className="text-[10px] uppercase font-semibold text-on-surface-variant">
+                Next Sitting
+              </p>
 
-            <span className="text-xs text-on-surface-variant">
-              {result || "No Result"}
-            </span>
-          </>
+              <p className="text-xs text-on-surface">
+                {nextSitting
+                  ? new Date(
+                      nextSitting
+                    ).toLocaleDateString()
+                  : "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[10px] uppercase font-semibold text-on-surface-variant">
+                Result
+              </p>
+
+              <p className="text-xs text-on-surface">
+                {result || "No Result"}
+              </p>
+            </div>
+          </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
 
-            {/* STATUS DROPDOWN */}
+            {/* =================================================
+                STATUS
+            ================================================= */}
 
-            <select
-              value={status}
-              disabled={saving}
-              onChange={(e) => {
-                const newStatus = e.target.value;
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
+                Status
+              </label>
 
-                setStatus(newStatus);
+              <select
+                value={status}
+                disabled={saving}
+                onChange={(event) =>
+                  handleStatusChange(
+                    event.target.value
+                  )
+                }
+                className="min-w-[145px] text-xs border border-outline-variant rounded-md px-3 py-2 bg-surface-container-lowest text-on-surface disabled:opacity-50"
+              >
+                {STATUSES.map((item) => (
+                  <option
+                    key={item.value}
+                    value={item.value}
+                  >
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                upsertExam({
-                  status: newStatus,
-                });
-              }}
-              className="text-xs border border-outline-variant rounded-md px-2 py-1.5 bg-surface-container-lowest capitalize disabled:opacity-50"
-            >
-              {STATUSES.map((item) => (
-                <option key={item} value={item}>
-                  {item.replace("_", " ")}
-                </option>
-              ))}
-            </select>
+            {/* =================================================
+                NEXT SITTING
+            ================================================= */}
 
-            {/* EXAM DATE */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
+                Next Sitting
+              </label>
 
-            <input
-              type="date"
-              value={nextSitting}
-              disabled={saving}
-              onChange={(e) => {
-                setNextSitting(e.target.value);
-              }}
-              onBlur={() => {
-                upsertExam({
-                  next_sitting:
-                    nextSitting || null,
-                });
-              }}
-              className="text-xs border border-outline-variant rounded-md px-2 py-1.5 disabled:opacity-50"
-            />
+              <input
+                type="date"
+                value={nextSitting}
+                disabled={saving}
+                onChange={(event) =>
+                  handleNextSittingChange(
+                    event.target.value
+                  )
+                }
+                onBlur={handleNextSittingBlur}
+                className="min-w-[145px] text-xs border border-outline-variant rounded-md px-3 py-2 bg-surface-container-lowest text-on-surface disabled:opacity-50"
+              />
+            </div>
 
-            {/* RESULT DROPDOWN */}
+            {/* =================================================
+                RESULT
+            ================================================= */}
 
-            <select
-              value={result}
-              disabled={saving}
-              onChange={(e) => {
-                const newResult = e.target.value;
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
+                Result
+              </label>
 
-                setResult(newResult);
-
-                upsertExam({
-                  result: newResult || null,
-                });
-              }}
-              className="text-xs border border-outline-variant rounded-md px-2 py-1.5 bg-surface-container-lowest disabled:opacity-50"
-            >
-              {RESULTS.map((item) => (
-                <option
-                  key={item.value || "no-result"}
-                  value={item.value}
-                >
-                  {item.label}
-                </option>
-              ))}
-            </select>
+              <select
+                value={result}
+                disabled={saving}
+                onChange={(event) =>
+                  handleResultChange(
+                    event.target.value
+                  )
+                }
+                className="min-w-[130px] text-xs border border-outline-variant rounded-md px-3 py-2 bg-surface-container-lowest text-on-surface disabled:opacity-50"
+              >
+                {RESULTS.map((item) => (
+                  <option
+                    key={item.value || "no-result"}
+                    value={item.value}
+                  >
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 
@@ -292,7 +470,9 @@ function ExamRow({
             STATUS PILL
         ===================================================== */}
 
-        <StatusPill status={status} />
+        <div className="shrink-0">
+          <StatusPill status={status} />
+        </div>
       </div>
 
       {/* =======================================================
@@ -300,8 +480,8 @@ function ExamRow({
       ======================================================= */}
 
       {saving && (
-        <p className="mt-2 text-xs text-on-surface-variant">
-          Saving...
+        <p className="mt-3 text-xs text-on-surface-variant">
+          Saving exam information...
         </p>
       )}
 
@@ -310,8 +490,8 @@ function ExamRow({
       ======================================================= */}
 
       {success && !error && (
-        <p className="mt-2 text-xs text-on-surface-variant bg-surface-container border border-outline-variant rounded-md px-2 py-1.5">
-          {success}
+        <p className="mt-3 text-xs text-on-surface-variant bg-surface-container border border-outline-variant rounded-md px-3 py-2">
+          ✓ {success}
         </p>
       )}
 
@@ -320,7 +500,7 @@ function ExamRow({
       ======================================================= */}
 
       {error && (
-        <p className="mt-2 text-xs text-error bg-error-container/40 border border-error/30 rounded-md px-2 py-1.5">
+        <p className="mt-3 text-xs text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2">
           <strong>Couldn&apos;t save:</strong>{" "}
           {error}
         </p>

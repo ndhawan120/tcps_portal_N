@@ -1,0 +1,59 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import RoleSelect from "@/app/admin/RoleSelect";
+
+type Employee = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  department: string | null;
+  role: string;
+  status: string;
+  avatar_url: string | null;
+  approvedPER: number;
+  pendingPER: number;
+  passedExams: number;
+  perProgress: number;
+  examProgress: number;
+};
+
+export default function EmployeeDirectory({ employees, isAdmin }: { employees: Employee[]; isAdmin: boolean }) {
+  const [query, setQuery] = useState("");
+  const [role, setRole] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [department, setDepartment] = useState("all");
+
+  const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department).filter(Boolean) as string[])).sort(), [employees]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return employees.filter((e) => {
+      const name = `${e.first_name ?? ""} ${e.last_name ?? ""}`.toLowerCase();
+      const searchMatch = !q || name.includes(q) || (e.email ?? "").toLowerCase().includes(q) || (e.department ?? "").toLowerCase().includes(q);
+      return searchMatch && (role === "all" || e.role === role) && (status === "all" || e.status === status) && (department === "all" || e.department === department);
+    });
+  }, [employees, query, role, status, department]);
+
+  const clear = () => { setQuery(""); setRole("all"); setStatus("all"); setDepartment("all"); };
+  const filtering = query || role !== "all" || status !== "all" || department !== "all";
+
+  return <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+    <div className="px-5 py-5 border-b border-outline-variant">
+      <h2 className="text-lg font-bold text-on-surface">Employee Directory</h2>
+      <p className="text-xs text-on-surface-variant mt-1">Showing {filtered.length} of {employees.length} employee{employees.length === 1 ? "" : "s"}.</p>
+      <div className="mt-4 flex flex-col lg:flex-row gap-2">
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search employee by name, email or department..." aria-label="Search employees" className="flex-1 rounded-md border border-outline-variant bg-background px-3 py-2 text-sm" />
+        <select value={role} onChange={(e) => setRole(e.target.value)} aria-label="Filter by role" className="rounded-md border border-outline-variant bg-background px-3 py-2 text-sm"><option value="all">All roles</option><option value="employee">Employees</option><option value="manager">Managers</option><option value="admin">Admins</option></select>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter by status" className="rounded-md border border-outline-variant bg-background px-3 py-2 text-sm"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="pending">Pending</option></select>
+        {departments.length > 0 && <select value={department} onChange={(e) => setDepartment(e.target.value)} aria-label="Filter by department" className="rounded-md border border-outline-variant bg-background px-3 py-2 text-sm"><option value="all">All departments</option>{departments.map((d) => <option key={d} value={d}>{d}</option>)}</select>}
+        {filtering && <button type="button" onClick={clear} className="rounded-md border border-outline-variant px-3 py-2 text-sm font-medium">Clear</button>}
+      </div>
+    </div>
+    {filtered.length === 0 ? <div className="px-6 py-12 text-center"><p className="text-sm font-semibold text-on-surface">No matching employees found.</p><p className="text-xs text-on-surface-variant mt-2">Try changing the search or filters.</p></div> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-container text-xs uppercase text-on-surface-variant"><tr><th className="text-left px-5 py-3">Employee</th><th className="text-left px-5 py-3">Department</th><th className="text-left px-5 py-3">Role</th><th className="text-left px-5 py-3">Status</th><th className="text-left px-5 py-3">PER</th><th className="text-left px-5 py-3">Exams</th><th className="text-left px-5 py-3">Pending</th><th className="px-5 py-3"></th></tr></thead><tbody className="divide-y divide-outline-variant">{filtered.map((employee) => <tr key={employee.id} className="hover:bg-surface-container-low"><td className="px-5 py-4"><div className="flex items-center gap-3">{employee.avatar_url ? <img src={employee.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" /> : <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-xs font-bold text-on-surface-variant">{getInitials(employee.first_name, employee.last_name)}</div>}<div><p className="font-semibold text-on-surface">{employee.first_name} {employee.last_name}</p><p className="text-xs text-on-surface-variant">{employee.email}</p></div></div></td><td className="px-5 py-4 text-on-surface-variant">{employee.department || "—"}</td><td className="px-5 py-4">{isAdmin ? <RoleSelect userId={employee.id} currentRole={employee.role} /> : <span className="text-xs font-semibold capitalize">{employee.role}</span>}</td><td className="px-5 py-4"><span className={`inline-flex text-xs font-semibold px-2 py-1 rounded-full capitalize ${employee.status === "active" ? "bg-green-100 text-green-800" : employee.status === "pending" ? "bg-amber-100 text-amber-800" : "bg-surface-container text-on-surface-variant"}`}>{employee.status}</span></td><td className="px-5 py-4"><ProgressMini completed={employee.approvedPER} total={22} percentage={employee.perProgress} /></td><td className="px-5 py-4"><ProgressMini completed={employee.passedExams} total={13} percentage={employee.examProgress} /></td><td className="px-5 py-4">{employee.pendingPER > 0 ? <span className="inline-flex text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">{employee.pendingPER}</span> : <span className="text-xs text-on-surface-variant">—</span>}</td><td className="px-5 py-4"><Link href={`/employee/${employee.id}`} className="text-xs font-semibold text-primary hover:underline whitespace-nowrap">View profile →</Link></td></tr>)}</tbody></table></div>}
+  </div>;
+}
+
+function ProgressMini({ completed, total, percentage }: { completed: number; total: number; percentage: number }) { return <div className="min-w-[100px]"><div className="flex justify-between text-xs mb-1"><span className="text-on-surface-variant">{completed}/{total}</span><span className="font-semibold text-primary">{percentage}%</span></div><div className="h-2 bg-surface-container rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full" style={{ width: `${percentage}%` }} /></div></div>; }
+function getInitials(firstName: string | null, lastName: string | null) { return `${firstName?.trim()?.charAt(0) ?? ""}${lastName?.trim()?.charAt(0) ?? ""}`.toUpperCase() || "U"; }

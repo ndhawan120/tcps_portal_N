@@ -19,8 +19,22 @@ export default async function AnnouncementsPage() {
 
   const { data: raw } = await supabase
     .from("announcements")
-    .select("id, title, body, created_at, author_id, profiles!announcements_author_id_fkey(first_name,last_name)")
+    .select("id, title, body, created_at, author_id")
     .order("created_at", { ascending: false });
+
+  // Fetch authors separately so the displayed poster name does not depend
+  // on the Supabase relationship alias/shape.
+  const authorIds = Array.from(new Set((raw ?? []).map((a: any) => a.author_id).filter(Boolean)));
+  const { data: authors } = authorIds.length
+    ? await supabase.from("profiles").select("id, first_name, last_name, email").in("id", authorIds)
+    : { data: [] as any[] };
+
+  const authorMap = new Map(
+    (authors ?? []).map((p: any) => [
+      p.id,
+      `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "TC Group Management",
+    ])
+  );
 
   const announcements: Announcement[] = (raw ?? []).map((a: any) => ({
     id: a.id,
@@ -28,7 +42,7 @@ export default async function AnnouncementsPage() {
     body: a.body,
     created_at: a.created_at,
     author_id: a.author_id,
-    author_name: `${a.profiles?.first_name ?? ""} ${a.profiles?.last_name ?? ""}`.trim(),
+    author_name: authorMap.get(a.author_id) ?? "TC Group Management",
   }));
 
   const canPost = profile?.role === "manager" || profile?.role === "admin";

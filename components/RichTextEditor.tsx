@@ -56,61 +56,73 @@ export default function RichTextEditor({ value, onChange, placeholder = "Write y
     reader.readAsDataURL(file);
   };
 
-  const toolbarButton = (label: string, action: () => void, extra = "") => (
-    <button type="button" title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={action} className={`px-2 py-1 rounded text-sm hover:bg-surface-container-lowest ${extra}`}>
-      {label}
+  const button = (label: string, action: () => void, icon: string, extra = "") => (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={action}
+      className={`inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-outline-variant bg-background px-2 text-xs font-semibold text-on-surface shadow-sm transition hover:bg-surface-container hover:border-primary/40 active:translate-y-px ${extra}`}
+    >
+      <span className="text-sm leading-none">{icon}</span>
+      <span className="hidden xl:inline">{label}</span>
     </button>
   );
 
+  const divider = <span className="mx-0.5 h-6 w-px bg-outline-variant" />;
+
   return (
-    <div className="rounded-md border border-outline-variant overflow-hidden bg-background">
-      <div className="flex flex-wrap items-center gap-1 border-b border-outline-variant bg-surface-container px-2 py-2">
-        {toolbarButton("Bold", () => command("bold"), "font-bold")}
-        {toolbarButton("Italic", () => command("italic"), "italic")}
-        {toolbarButton("Underline", () => command("underline"), "underline")}
-        {toolbarButton("Strikethrough", () => command("strikeThrough"), "line-through")}
-        <span className="mx-1 h-5 w-px bg-outline-variant" />
-        <select title="Text style" defaultValue="p" onChange={(e) => command("formatBlock", e.target.value)} className="text-xs border border-outline-variant rounded px-2 py-1 bg-background">
+    <div className="rounded-lg border border-outline-variant overflow-hidden bg-background shadow-sm">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-outline-variant bg-surface-container p-2">
+        {button("Bold", () => command("bold"), "B", "font-bold")}
+        {button("Italic", () => command("italic"), "I", "italic")}
+        {button("Underline", () => command("underline"), "U", "underline")}
+        {button("Strikethrough", () => command("strikeThrough"), "S", "line-through")}
+        {divider}
+        <select title="Text style" defaultValue="p" onChange={(e) => command("formatBlock", e.target.value)} className="h-8 rounded-md border border-outline-variant bg-background px-2 text-xs font-semibold text-on-surface shadow-sm hover:bg-surface-container">
           <option value="p">Paragraph</option>
           <option value="h2">Heading 2</option>
           <option value="h3">Heading 3</option>
           <option value="h4">Heading 4</option>
           <option value="blockquote">Quote</option>
         </select>
-        <select title="Font size" defaultValue="3" onChange={(e) => command("fontSize", e.target.value)} className="text-xs border border-outline-variant rounded px-2 py-1 bg-background">
+        <select title="Font size" defaultValue="3" onChange={(e) => command("fontSize", e.target.value)} className="h-8 rounded-md border border-outline-variant bg-background px-2 text-xs font-semibold text-on-surface shadow-sm hover:bg-surface-container">
           <option value="2">Small</option>
           <option value="3">Normal</option>
           <option value="4">Large</option>
           <option value="5">Extra large</option>
         </select>
-        <span className="mx-1 h-5 w-px bg-outline-variant" />
-        {toolbarButton("Bulleted list", () => command("insertUnorderedList"))}
-        {toolbarButton("Numbered list", () => command("insertOrderedList"))}
-        {toolbarButton("Decrease indent", () => command("outdent"))}
-        {toolbarButton("Increase indent", () => command("indent"))}
-        <span className="mx-1 h-5 w-px bg-outline-variant" />
-        {toolbarButton("Align left", () => command("justifyLeft"))}
-        {toolbarButton("Center", () => command("justifyCenter"))}
-        {toolbarButton("Align right", () => command("justifyRight"))}
-        <span className="mx-1 h-5 w-px bg-outline-variant" />
-        {toolbarButton("Add link", addLink)}
-        {toolbarButton("Add image URL", addImageUrl)}
-        {toolbarButton("Upload image", () => imageInputRef.current?.click())}
-        {toolbarButton("Undo", () => command("undo"))}
-        {toolbarButton("Redo", () => command("redo"))}
-        {toolbarButton("Clear formatting", () => command("removeFormat"), "text-xs")}
-        {toolbarButton(showHtml ? "Visual editor" : "HTML", () => setShowHtml((v) => !v), "text-xs")}
+        {divider}
+        {button("Bulleted list", () => command("insertUnorderedList"), "•")}
+        {button("Numbered list", () => command("insertOrderedList"), "1.")}
+        {button("Decrease indent", () => command("outdent"), "←")}
+        {button("Increase indent", () => command("indent"), "→")}
+        {divider}
+        {button("Align left", () => command("justifyLeft"), "≡")}
+        {button("Center", () => command("justifyCenter"), "≡")}
+        {button("Align right", () => command("justifyRight"), "≡")}
+        {divider}
+        {button("Add link", addLink, "🔗")}
+        {button("Image URL", addImageUrl, "🖼")}
+        {button("Upload image", () => imageInputRef.current?.click(), "⬆")}
+        {divider}
+        {button("Undo", () => command("undo"), "↶")}
+        {button("Redo", () => command("redo"), "↷")}
+        {button("Clear formatting", () => command("removeFormat"), "Tx")}
+        {button(showHtml ? "Visual editor" : "HTML", () => setShowHtml((v) => !v), "<>" , "ml-auto")}
       </div>
 
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) insertImageFile(file); e.currentTarget.value = ""; }} />
 
       {showHtml ? (
-        <textarea value={value} onChange={(e) => onChange(e.target.value)} className="w-full min-h-48 p-3 text-xs font-mono bg-background outline-none" aria-label="HTML editor" />
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} className="w-full min-h-48 p-4 text-xs font-mono bg-background outline-none" aria-label="HTML editor" />
       ) : (
-        <div ref={editorRef} contentEditable suppressContentEditableWarning data-placeholder={placeholder} onInput={sync} className="min-h-48 max-h-[500px] overflow-y-auto px-4 py-3 text-sm outline-none prose prose-sm max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-on-surface-variant [&_img]:max-w-full [&_img]:h-auto [&_a]:text-primary [&_blockquote]:border-l-4 [&_blockquote]:pl-3" />
+        <div ref={editorRef} contentEditable suppressContentEditableWarning data-placeholder={placeholder} onInput={sync} className="min-h-52 max-h-[500px] overflow-y-auto px-4 py-3 text-sm outline-none prose prose-sm max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-on-surface-variant [&_img]:max-w-full [&_img]:h-auto [&_a]:text-primary [&_blockquote]:border-l-4 [&_blockquote]:pl-3" />
       )}
-      <div className="px-3 py-1.5 text-[11px] text-on-surface-variant border-t border-outline-variant">
-        You can format text, add links, upload images, insert image URLs, lists, headings, quotes and alignment. Uploaded images are embedded in the announcement.
+      <div className="flex items-center justify-between gap-3 px-3 py-2 text-[11px] text-on-surface-variant border-t border-outline-variant bg-surface-container/40">
+        <span>Rich formatting, links, lists, headings and images.</span>
+        <span>Image limit: 2 MB</span>
       </div>
     </div>
   );

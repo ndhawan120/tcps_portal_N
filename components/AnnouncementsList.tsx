@@ -95,9 +95,18 @@ export default function AnnouncementsList({ announcements, compact = false, curr
                     {canManage && compact && (canDeleteAny || a.author_id === currentUserId) && <button onClick={() => handleDelete(a.id)} className="text-xs text-on-surface-variant hover:text-error shrink-0">✕</button>}
                   </div>
                 </div>
-                <div className="mt-2 prose prose-sm max-w-none text-on-surface [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mb-3 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-2 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mb-2 [&_h4]:font-bold [&_h4]:mb-2 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:pl-3 [&_blockquote]:italic [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-3 line-clamp-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(a.body) }} />
+
+                {/* Fixed-height preview. The full HTML remains available in the popup. */}
+                <div className="relative mt-2 max-h-28 overflow-hidden">
+                  <div
+                    className="prose prose-sm max-w-none text-on-surface [&_h1]:text-xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mb-2 [&_h4]:font-bold [&_h4]:mb-2 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:pl-3 [&_blockquote]:italic [&_img]:max-w-full [&_img]:max-h-24 [&_img]:object-cover [&_img]:rounded-lg [&_img]:my-2"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(a.body) }}
+                  />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-surface-container-lowest to-transparent" />
+                </div>
+
                 <p className="text-[11px] text-on-surface-variant mt-2">{a.author_name} · {new Date(a.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</p>
-                <p className="text-[11px] text-primary font-medium mt-2">Click to view full update →</p>
+                <p className="text-[11px] text-primary font-medium mt-2">Read full update →</p>
               </div>
             );
           })}

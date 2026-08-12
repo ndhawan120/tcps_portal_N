@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const BASE_ROLES = ["employee", "manager", "admin"] as const;
-type CustomRole = { id: string; name: string; slug: string; base_role: string };
+type CustomRole = { id: string; name: string; slug: string; base_role: string; is_active: boolean };
 type Department = { id: string; name: string; slug: string; is_active: boolean };
 
 const cleanName = (value: string) => value.trim().replace(/[^a-zA-Z0-9 &-]/g, "").replace(/\s+/g, " ").replace(/^[-& ]+|[-& ]+$/g, "");
+const cleanRoleName = (value: string) => value.trim().replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, " ");
 const slugify = (value: string) => value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 export default function RoleManager() {
@@ -16,6 +17,9 @@ export default function RoleManager() {
   const [roleName, setRoleName] = useState("");
   const [departmentName, setDepartmentName] = useState("");
   const [baseRole, setBaseRole] = useState<(typeof BASE_ROLES)[number]>("employee");
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [editingRoleName, setEditingRoleName] = useState("");
+  const [editingBaseRole, setEditingBaseRole] = useState<(typeof BASE_ROLES)[number]>("employee");
   const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(null);
   const [editingDepartmentName, setEditingDepartmentName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -24,7 +28,7 @@ export default function RoleManager() {
 
   const load = async () => {
     const [{ data: roleData }, { data: departmentData }] = await Promise.all([
-      supabase.from("custom_roles").select("id,name,slug,base_role").order("name"),
+      supabase.from("custom_roles").select("id,name,slug,base_role,is_active").order("name"),
       supabase.from("departments").select("id,name,slug,is_active").order("name"),
     ]);
     setRoles(roleData ?? []);
@@ -34,18 +38,39 @@ export default function RoleManager() {
   useEffect(() => { load(); }, []);
 
   const createRole = async () => {
-    const clean = roleName.trim().replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, " ");
+    const clean = cleanRoleName(roleName);
     if (!clean) return setError("Enter a role name using letters and numbers only.");
     setSaving(true); setError(null);
-    const { error: insertError } = await supabase.from("custom_roles").insert({ name: clean, slug: slugify(clean), base_role: baseRole });
+    const { error: insertError } = await supabase.from("custom_roles").insert({ name: clean, slug: slugify(clean), base_role: baseRole, is_active: true });
     setSaving(false);
     if (insertError) { setError(insertError.code === "23505" ? "A role with this name already exists." : insertError.message); return; }
     setRoleName("");
     await load();
   };
 
+  const saveRole = async (role: CustomRole) => {
+    const clean = cleanRoleName(editingRoleName);
+    if (!clean) return setError("Enter a valid role name.");
+    setSaving(true); setError(null);
+    const { error: updateError } = await supabase.from("custom_roles").update({ name: clean, slug: slugify(clean), base_role: editingBaseRole }).eq("id", role.id);
+    setSaving(false);
+    if (updateError) { setError(updateError.code === "23505" ? "A role with this name already exists." : updateError.message); return; }
+    setEditingRoleId(null);
+    setEditingRoleName("");
+    await load();
+  };
+
+  const toggleRole = async (role: CustomRole) => {
+    if (!window.confirm(`${role.is_active ? "Disable" : "Enable"} the role “${role.name}”?`)) return;
+    setError(null);
+    const { error: updateError } = await supabase.from("custom_roles").update({ is_active: !role.is_active }).eq("id", role.id);
+    if (updateError) { setError(updateError.message); return; }
+    await load();
+  };
+
   const deleteRole = async (role: CustomRole) => {
     if (!window.confirm(`Delete the custom role “${role.name}”? Users assigned to it will return to the standard ${role.base_role} role.`)) return;
+    setError(null);
     const { error: deleteError } = await supabase.from("custom_roles").delete().eq("id", role.id);
     if (deleteError) { setError(deleteError.message); return; }
     await load();
@@ -101,7 +126,7 @@ export default function RoleManager() {
         <div><h2 className="text-lg font-bold text-on-surface">Roles</h2><p className="text-xs text-on-surface-variant mt-1 max-w-2xl">Create a custom role name while inheriting an existing access tier. Employee, Manager and Admin remain the underlying security levels.</p></div>
         <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto"><input value={roleName} onChange={(e) => setRoleName(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ""))} placeholder="New role name" maxLength={60} className="rounded-md border border-outline-variant bg-background px-3 py-2 text-sm" /><select value={baseRole} onChange={(e) => setBaseRole(e.target.value as (typeof BASE_ROLES)[number])} className="rounded-md border border-outline-variant bg-background px-3 py-2 text-sm"><option value="employee">Employee access</option><option value="manager">Manager access</option><option value="admin">Admin access</option></select><button type="button" onClick={createRole} disabled={saving} className="rounded-md bg-primary text-on-primary px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Adding..." : "+ Add role"}</button></div>
       </div>
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{roles.map((role) => <div key={role.id} className="border border-outline-variant rounded-lg p-3 flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-on-surface">{role.name}</p><p className="text-[11px] text-on-surface-variant capitalize">{role.base_role} access</p></div><button type="button" onClick={() => deleteRole(role)} className="text-xs font-medium text-error hover:underline">Delete</button></div>)}{roles.length === 0 && <p className="text-xs text-on-surface-variant">No custom roles created yet.</p>}</div>
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">{roles.map((role) => <div key={role.id} className="border border-outline-variant rounded-lg p-3"><div className="flex items-center justify-between gap-3">{editingRoleId === role.id ? <div className="flex flex-1 flex-col sm:flex-row gap-2"><input value={editingRoleName} onChange={(e) => setEditingRoleName(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ""))} className="flex-1 rounded-md border border-outline-variant bg-background px-2 py-1 text-sm" /><select value={editingBaseRole} onChange={(e) => setEditingBaseRole(e.target.value as (typeof BASE_ROLES)[number])} className="rounded-md border border-outline-variant bg-background px-2 py-1 text-sm"><option value="employee">Employee access</option><option value="manager">Manager access</option><option value="admin">Admin access</option></select></div> : <div><p className="text-sm font-semibold text-on-surface">{role.name}</p><p className="text-[11px] text-on-surface-variant">{role.is_active ? "Active" : "Inactive"} · <span className="capitalize">{role.base_role}</span> access</p></div>}<div className="flex items-center gap-2 shrink-0">{editingRoleId === role.id ? <><button type="button" disabled={saving} onClick={() => saveRole(role)} className="text-xs font-semibold text-primary">Save</button><button type="button" onClick={() => setEditingRoleId(null)} className="text-xs text-on-surface-variant">Cancel</button></> : <><button type="button" onClick={() => { setEditingRoleId(role.id); setEditingRoleName(role.name); setEditingBaseRole(role.base_role as (typeof BASE_ROLES)[number]); }} className="text-xs font-medium text-primary">Edit</button><button type="button" onClick={() => toggleRole(role)} className="text-xs font-medium text-on-surface-variant">{role.is_active ? "Disable" : "Enable"}</button><button type="button" onClick={() => deleteRole(role)} className="text-xs font-medium text-error">Delete</button></>}</div></div></div>)}{roles.length === 0 && <p className="text-xs text-on-surface-variant">No custom roles created yet.</p>}</div>
     </section>
 
     <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">

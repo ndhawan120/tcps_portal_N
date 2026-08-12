@@ -35,9 +35,9 @@ export default function Nav({ role, name }: { role: string; name: string }) {
   ];
 
   return (
-    <nav className="flex items-center justify-between bg-surface-container-lowest border-b border-outline-variant px-6 py-3">
+    <nav className="sticky top-0 z-40 flex items-center justify-between bg-secondary text-on-secondary border-b border-secondary px-6 py-3 shadow-sm">
       <div className="flex items-center gap-8 min-w-0">
-        <Link href="/dashboard" className="text-lg font-extrabold text-primary shrink-0">
+        <Link href="/dashboard" className="text-lg font-extrabold text-primary shrink-0 tracking-tight">
           TC Group
         </Link>
         <div className="flex gap-5 flex-wrap">
@@ -48,7 +48,7 @@ export default function Nav({ role, name }: { role: string; name: string }) {
                 key={link.href}
                 href={link.href}
                 className={`text-sm font-medium transition-colors ${
-                  active ? "text-primary" : "text-on-surface hover:text-primary"
+                  active ? "text-primary" : "text-white/85 hover:text-primary"
                 }`}
               >
                 {link.label}
@@ -58,10 +58,10 @@ export default function Nav({ role, name }: { role: string; name: string }) {
         </div>
       </div>
       <div className="flex items-center gap-4 shrink-0">
-        <Link href="/profile" className="text-sm text-on-surface-variant hover:text-primary">
+        <Link href="/profile" className="text-sm text-white/80 hover:text-primary">
           {name}
         </Link>
-        <button onClick={handleLogout} className="text-sm font-medium text-primary hover:underline">
+        <button onClick={handleLogout} className="text-sm font-medium text-primary hover:text-white transition-colors">
           Log out
         </button>
       </div>

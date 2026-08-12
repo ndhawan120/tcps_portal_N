@@ -19,12 +19,7 @@ export default async function ManagerPage() {
   if (!profile || (profile.role !== "manager" && profile.role !== "admin")) redirect("/dashboard");
 
   const isAdmin = profile.role === "admin";
-
-  let teamQuery = supabase
-    .from("profiles")
-    .select("*")
-    .eq("role", "employee");
-
+  let teamQuery = supabase.from("profiles").select("*").eq("role", "employee");
   if (!isAdmin) teamQuery = teamQuery.eq("manager_id", user.id);
 
   const { data: team } = await teamQuery.order("last_name", { ascending: true });
@@ -64,12 +59,7 @@ export default async function ManagerPage() {
   }
 
   const avgProgress = teamMembers.length
-    ? Math.round(
-        teamMembers.reduce(
-          (sum, member) => sum + ((progressByUser[member.id] ?? 0) / TOTAL_OBJECTIVES) * 100,
-          0
-        ) / teamMembers.length
-      )
+    ? Math.round(teamMembers.reduce((sum, member) => sum + ((progressByUser[member.id] ?? 0) / TOTAL_OBJECTIVES) * 100, 0) / teamMembers.length)
     : 0;
 
   return (
@@ -101,9 +91,7 @@ export default async function ManagerPage() {
           <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
             <h2 className="text-lg font-bold text-on-surface mb-2">PER Approval Queue</h2>
             <p className="text-sm text-on-surface-variant mb-4">Pending submissions from the employees in this reporting scope.</p>
-            <Link href="/approvals" className="inline-flex text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary">
-              Review Approvals ({pending?.length ?? 0})
-            </Link>
+            <Link href="/approvals" className="inline-flex text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary">Review Approvals ({pending?.length ?? 0})</Link>
           </section>
         </div>
 
@@ -138,7 +126,7 @@ export default async function ManagerPage() {
                   const approved = progressByUser[member.id] ?? 0;
                   const passed = examsPassedByUser[member.id] ?? 0;
                   const pct = Math.round((approved / TOTAL_OBJECTIVES) * 100);
-                  return <tr key={member.id}><td className="px-5 py-3 font-medium text-on-surface">{member.first_name} {member.last_name}</td><td className="px-5 py-3 text-on-surface-variant">{approved}/{TOTAL_OBJECTIVES} ({pct}%)</td><td className="px-5 py-3 text-on-surface-variant">{passed}/{TOTAL_EXAMS}</td><td className="px-5 py-3"><Link href={`/employees/${member.id}`} className="text-xs font-medium text-primary hover:underline">View details →</Link></td></tr>;
+                  return <tr key={member.id}><td className="px-5 py-3 font-medium text-on-surface">{member.first_name} {member.last_name}</td><td className="px-5 py-3 text-on-surface-variant">{approved}/{TOTAL_OBJECTIVES} ({pct}%)</td><td className="px-5 py-3 text-on-surface-variant">{passed}/{TOTAL_EXAMS}</td><td className="px-5 py-3"><Link href={`/employee/${member.id}`} className="text-xs font-medium text-primary hover:underline">View details →</Link></td></tr>;
                 })}
                 {teamMembers.length === 0 && <tr><td colSpan={4} className="px-5 py-6 text-center text-on-surface-variant">{isAdmin ? "No employees yet." : "No direct reports assigned yet."}</td></tr>}
               </tbody>

@@ -1,18 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-
 import Nav from "@/components/Nav";
-
 import RoleSelect from "./RoleSelect";
 import DepartmentSelect from "./DepartmentSelect";
 import StatusSelect from "./StatusSelect";
 import ManagerSelect from "./ManagerSelect";
 import AddUserModal from "./AddUserModal";
-import RegistrationApproval from "./RegistrationApproval";
-
-const TOTAL_OBJECTIVES = 22;
-const TOTAL_EXAMS = 13;
 
 export default async function AdminPage() {
   const supabase = createClient();
@@ -25,141 +19,217 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  const { data: profile } =
-    await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
+  /*
+   * Only administrators should access this page.
+   */
   if (profile?.role !== "admin") {
     redirect("/dashboard");
   }
 
-  const { data: allUsers } =
-    await supabase
-      .from("profiles")
-      .select("*")
-      .order("last_name");
+  /*
+   * Get all users.
+   */
+  const { data: allUsers, error: usersError } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("last_name", { ascending: true });
 
-  const { data: pendingUsers } =
-    await supabase
-      .from("profiles")
-      .select(
-        "id,first_name,last_name,email,department,created_at"
-      )
-      .eq("status", "pending")
-      .order("created_at", {
-        ascending: true,
-      });
+  if (usersError) {
+    console.error("Failed to load users:", usersError);
+  }
 
-  const { data: allObjectives } =
-    await supabase
-      .from("per_objectives")
-      .select("status");
+  const users = allUsers ?? [];
 
-  const { data: allExams } =
-    await supabase
-      .from("exams")
-      .select("status");
+  /*
+   * Managers and admins are available for assignment
+   * as employee managers.
+   */
+  const managers = users.filter(
+    (u) => u.role === "manager" || u.role === "admin"
+  );
 
-  const employees =
-    (allUsers ?? []).filter(
-      (u) => u.role === "employee"
-    );
+  /*
+   * Basic counts for the admin page.
+   *
+   * These are intentionally simple account statistics.
+   * Detailed PER/exam reporting belongs on the reporting/dashboard
+   * areas rather than this administration page.
+   */
+  const totalUsers = users.length;
 
-  const approvedCount =
-    allObjectives?.filter(
-      (o) => o.status === "approved"
-    ).length ?? 0;
+  const activeUsers = users.filter(
+    (u) => u.status === "active"
+  ).length;
 
-  const passedCount =
-    allExams?.filter(
-      (e) => e.status === "passed"
-    ).length ?? 0;
+  const pendingUsers = users.filter(
+    (u) =>
+      u.status === "pending" ||
+      u.status === "pending_approval"
+  ).length;
 
-  const userCount =
-    employees.length || 1;
-
-  const globalObjectiveProgress =
-    Math.round(
-      (approvedCount /
-        (userCount * TOTAL_OBJECTIVES)) *
-        100
-    );
-
-  const globalExamProgress =
-    Math.round(
-      (passedCount /
-        (userCount * TOTAL_EXAMS)) *
-        100
-    );
-
-  const managers =
-    (allUsers ?? []).filter(
-      (u) =>
-        u.role === "manager" ||
-        u.role === "admin"
-    );
+  const inactiveUsers = users.filter(
+    (u) => u.status === "inactive"
+  ).length;
 
   return (
     <div>
-
       <Nav
-        role="admin"
-        name={`${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`}
+        role={profile?.role ?? "admin"}
+        name={`${profile?.first_name ?? ""} ${
+          profile?.last_name ?? ""
+        }`}
       />
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-6 py-8">
 
-        <div className="flex items-center justify-between mb-1">
+        {/* =====================================================
+            HEADER
+        ====================================================== */}
 
-          <h1 className="text-2xl font-bold text-on-surface">
-            Admin Panel
-          </h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-on-surface">
+              Admin Panel
+            </h1>
 
-          <div className="flex gap-2">
+            <p className="text-sm text-on-surface-variant mt-1">
+              Manage employee accounts, roles, departments and
+              reporting relationships.
+            </p>
+          </div>
 
+          <div className="flex items-center gap-2">
             <Link
-              href="/admin/employees"
-              className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant text-on-surface hover:bg-surface-container"
+              href="/employees"
+              className="text-sm font-medium px-4 py-2 rounded-md border border-outline-variant text-on-surface hover:bg-surface-container"
             >
-              Employees
+              View Employees
             </Link>
 
             <AddUserModal />
-
           </div>
+        </div>
+
+        {/* =====================================================
+            ACCOUNT SUMMARY
+        ====================================================== */}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+          <AdminStatCard
+            label="Total Users"
+            value={totalUsers}
+          />
+
+          <AdminStatCard
+            label="Active Users"
+            value={activeUsers}
+          />
+
+          <AdminStatCard
+            label="Pending Approval"
+            value={pendingUsers}
+          />
+
+          <AdminStatCard
+            label="Inactive Users"
+            value={inactiveUsers}
+          />
 
         </div>
 
-        <p className="text-sm text-on-surface-variant mb-8">
-          Company-wide PER progress:{" "}
-          <span className="font-semibold text-primary">
-            {globalObjectiveProgress}%
-          </span>
-          {" · "}
-          Exam pass rate:{" "}
-          <span className="font-semibold text-primary">
-            {globalExamProgress}%
-          </span>
-        </p>
+        {/* =====================================================
+            QUICK LINKS
+        ====================================================== */}
 
-        <RegistrationApproval
-          users={pendingUsers ?? []}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+
+          <Link
+            href="/employees"
+            className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:bg-surface-container transition"
+          >
+            <p className="text-sm font-bold text-on-surface">
+              Employees
+            </p>
+
+            <p className="text-xs text-on-surface-variant mt-1">
+              View employee profiles, PER progress, exams and
+              individual records.
+            </p>
+
+            <p className="text-xs font-semibold text-primary mt-4">
+              View employees →
+            </p>
+          </Link>
+
+          <Link
+            href="/approvals"
+            className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:bg-surface-container transition"
+          >
+            <p className="text-sm font-bold text-on-surface">
+              Approvals
+            </p>
+
+            <p className="text-xs text-on-surface-variant mt-1">
+              Review pending PER objective submissions from
+              employees.
+            </p>
+
+            <p className="text-xs font-semibold text-primary mt-4">
+              Review approvals →
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard"
+            className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:bg-surface-container transition"
+          >
+            <p className="text-sm font-bold text-on-surface">
+              Reporting Dashboard
+            </p>
+
+            <p className="text-xs text-on-surface-variant mt-1">
+              View overall PER and exam reporting and progress.
+            </p>
+
+            <p className="text-xs font-semibold text-primary mt-4">
+              Open dashboard →
+            </p>
+          </Link>
+
+        </div>
+
+        {/* =====================================================
+            USER ACCOUNTS
+        ====================================================== */}
 
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
 
-          <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+          <div className="px-5 pt-5 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 
-            <h2 className="text-lg font-bold text-on-surface">
-              User Accounts
-            </h2>
+            <div>
+              <h2 className="text-lg font-bold text-on-surface">
+                User Accounts
+              </h2>
 
-            <span className="text-xs text-on-surface-variant">
-              {allUsers?.length ?? 0} users
-            </span>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Manage account access, role, department, manager
+                and account status.
+              </p>
+            </div>
+
+            <Link
+              href="/employees"
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              Open employee directory →
+            </Link>
 
           </div>
 
@@ -196,7 +266,7 @@ export default async function AdminPage() {
                   </th>
 
                   <th className="text-left px-5 py-3">
-                    Details
+                    Employee
                   </th>
 
                 </tr>
@@ -205,17 +275,30 @@ export default async function AdminPage() {
 
               <tbody className="divide-y divide-outline-variant">
 
-                {(allUsers ?? []).map((u) => (
+                {users.map((u) => (
 
-                  <tr key={u.id}>
+                  <tr
+                    key={u.id}
+                    className="hover:bg-surface-container/40"
+                  >
+
+                    {/* NAME */}
 
                     <td className="px-5 py-3 font-medium text-on-surface whitespace-nowrap">
+
                       {u.first_name} {u.last_name}
+
                     </td>
 
+                    {/* EMAIL */}
+
                     <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">
+
                       {u.email}
+
                     </td>
+
+                    {/* DEPARTMENT */}
 
                     <td className="px-5 py-3">
 
@@ -226,6 +309,8 @@ export default async function AdminPage() {
 
                     </td>
 
+                    {/* ROLE */}
+
                     <td className="px-5 py-3">
 
                       <RoleSelect
@@ -234,6 +319,8 @@ export default async function AdminPage() {
                       />
 
                     </td>
+
+                    {/* MANAGER */}
 
                     <td className="px-5 py-3">
 
@@ -245,6 +332,8 @@ export default async function AdminPage() {
 
                     </td>
 
+                    {/* STATUS */}
+
                     <td className="px-5 py-3">
 
                       <StatusSelect
@@ -254,18 +343,16 @@ export default async function AdminPage() {
 
                     </td>
 
+                    {/* EMPLOYEE DETAILS */}
+
                     <td className="px-5 py-3">
 
-                      {u.id !== user.id && (
-
-                        <Link
-                          href={`/employee/${u.id}`}
-                          className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
-                        >
-                          View details →
-                        </Link>
-
-                      )}
+                      <Link
+                        href={`/employees/${u.id}`}
+                        className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
+                      >
+                        View profile →
+                      </Link>
 
                     </td>
 
@@ -279,14 +366,60 @@ export default async function AdminPage() {
 
           </div>
 
+          {users.length === 0 && (
+
+            <div className="px-5 py-10 text-center">
+
+              <p className="text-sm text-on-surface-variant">
+                No user accounts found.
+              </p>
+
+            </div>
+
+          )}
+
         </div>
 
+        {/* =====================================================
+            HELP TEXT
+        ====================================================== */}
+
         <p className="text-xs text-on-surface-variant mt-4">
-          New registrations remain pending until an administrator approves them.
-          Existing users can be assigned roles, departments, managers and account status from this page.
+
+          Use &quot;+ Add User&quot; to create an account directly.
+          New registrations can be kept pending until an
+          administrator approves them. Managers can be assigned
+          to employees from the Manager column.
+
         </p>
 
       </main>
+    </div>
+  );
+}
+
+
+/* =============================================================
+   ADMIN STAT CARD
+============================================================= */
+
+function AdminStatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
+
+      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant mb-1">
+        {label}
+      </p>
+
+      <p className="text-3xl font-extrabold text-primary">
+        {value}
+      </p>
 
     </div>
   );

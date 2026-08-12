@@ -4,8 +4,52 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+:root {
+  --tc-orange: #f15a24;
+  --tc-charcoal: #171717;
+  --tc-warm-white: #f7f5f2;
+  --tc-border: #d5d0ca;
+}
+
+html {
+  background: var(--tc-warm-white);
+}
+
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #f9f9f9;
-  color: #1a1c1c;
+  background-color: var(--tc-warm-white);
+  color: var(--tc-charcoal);
+}
+
+::selection {
+  background: #ffd2c1;
+  color: #171717;
+}
+
+button,
+a,
+select,
+input,
+textarea {
+  accent-color: var(--tc-orange);
+}
+
+/* Shared branded scrollbar for long dashboards, tables and update lists. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c9c3bd transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c9c3bd;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
 }

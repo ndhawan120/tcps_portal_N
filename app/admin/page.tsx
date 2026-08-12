@@ -5,57 +5,70 @@ import Nav from "@/components/Nav";
 import AddUserModal from "./AddUserModal";
 import RegistrationApproval from "./RegistrationApproval";
 import RealtimeRefresh from "@/components/RealtimeRefresh";
-import PeopleAccess from "./PeopleAccess";
-
-const PER_STATUSES = ["not_started", "draft", "pending_approval", "approved", "rejected"];
-const EXAM_STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"];
-const EXAM_RESULTS = ["No Result", "Pass", "Fail", "Exempt"];
 
 export default async function AdminPage() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (profile?.role !== "admin") redirect("/dashboard");
+  if (profile?.role !== "admin" || profile.status !== "active") redirect("/dashboard");
 
-  const { data: allUsers } = await supabase.from("profiles").select("*").order("last_name", { ascending: true });
-  const users = allUsers ?? [];
-  const employees = users.filter((u) => u.role === "employee");
-  const people = users.filter((u) => u.id !== user.id && u.role !== "admin");
-  const employeeIds = employees.map((u) => u.id);
-  const managers = users.filter((u) => u.role === "manager" || u.role === "admin");
-
-  const [{ data: allObjectives }, { data: allExams }] = await Promise.all([
-    employeeIds.length ? supabase.from("per_objectives").select("status").in("user_id", employeeIds) : Promise.resolve({ data: [] as { status: string }[] }),
-    employeeIds.length ? supabase.from("exams").select("status,result").in("user_id", employeeIds) : Promise.resolve({ data: [] as { status: string; result: string | null }[] }),
-  ]);
-
-  const perCounts: Record<string, number> = Object.fromEntries(PER_STATUSES.map((status) => [status, 0]));
-  const examCounts: Record<string, number> = Object.fromEntries(EXAM_STATUSES.map((status) => [status, 0]));
-  const resultCounts: Record<string, number> = Object.fromEntries(EXAM_RESULTS.map((result) => [result, 0]));
-  for (const objective of allObjectives ?? []) perCounts[objective.status] = (perCounts[objective.status] ?? 0) + 1;
-  for (const exam of allExams ?? []) { examCounts[exam.status] = (examCounts[exam.status] ?? 0) + 1; const result = exam.result ?? "No Result"; resultCounts[result] = (resultCounts[result] ?? 0) + 1; }
-
-  const pendingUsers = users.filter((u) => u.status === "pending").length;
+  const { data: users } = await supabase.from("profiles").select("id,role,status");
+  const people = users ?? [];
+  const employees = people.filter((u) => u.role === "employee");
+  const pendingUsers = people.filter((u) => u.status === "pending").length;
   const activeUsers = employees.filter((u) => u.status === "active").length;
-  const pendingPER = perCounts.pending_approval ?? 0;
 
-  return <div>
-    <RealtimeRefresh />
-    <Nav role="admin" name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} />
-    <main className="max-w-7xl mx-auto px-6 py-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6"><div><h1 className="text-2xl font-bold text-on-surface">Admin Panel</h1><p className="text-sm text-on-surface-variant mt-1">Manage employees, managers, reporting relationships, approvals and company reporting.</p></div><div className="flex gap-2"><Link href="/employees" className="text-sm font-medium px-4 py-2 rounded-md border border-outline-variant">View Employees</Link><AddUserModal /></div></div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"><AdminStatCard label="Total Employees" value={employees.length} /><AdminStatCard label="Active Employees" value={activeUsers} /><AdminStatCard label="Pending Signups" value={pendingUsers} /><AdminStatCard label="Pending PER Approvals" value={pendingPER} /></div>
-      <RegistrationApproval />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"><StatusChart title="PER Objective Status" counts={perCounts} statuses={PER_STATUSES} /><StatusChart title="Exam Status" counts={examCounts} statuses={EXAM_STATUSES} /></div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><StatusChart title="Exam Result" counts={resultCounts} statuses={EXAM_RESULTS} /><section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold text-on-surface mb-2">Administration</h2><p className="text-sm text-on-surface-variant mb-4">Manage roles and access separately, or open the employee directory for people-level actions.</p><div className="flex flex-wrap gap-2"><Link href="/admin/roles" className="text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary">Roles & Access</Link><Link href="/employees" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant">People & Access</Link><Link href="/approvals" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant">PER Approvals ({pendingPER})</Link></div></section></div>
+  const { count: pendingPER } = await supabase
+    .from("per_objectives")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending_approval");
 
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-        <div className="px-5 pt-5 pb-4"><h2 className="text-lg font-bold text-on-surface">People & Access</h2><p className="text-xs text-on-surface-variant mt-1">Search employees and managers, filter by access role or status, and manage department, role, manager and account status.</p></div>
-        <PeopleAccess people={people} managers={managers} />
-      </div>
-    </main>
-  </div>;
+  return (
+    <div>
+      <RealtimeRefresh />
+      <Nav role="admin" name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} />
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-on-surface">Admin Panel</h1>
+            <p className="text-sm text-on-surface-variant mt-1">Manage people, access, reporting relationships, approvals and company administration.</p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/employees" className="text-sm font-medium px-4 py-2 rounded-md border border-outline-variant">View People</Link>
+            <AddUserModal />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <AdminStatCard label="Total Employees" value={employees.length} />
+          <AdminStatCard label="Active Employees" value={activeUsers} />
+          <AdminStatCard label="Pending Signups" value={pendingUsers} />
+          <AdminStatCard label="Pending PER Approvals" value={pendingPER ?? 0} />
+        </div>
+
+        <RegistrationApproval />
+
+        <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 mt-6">
+          <h2 className="text-lg font-bold text-on-surface">Administration</h2>
+          <p className="text-sm text-on-surface-variant mt-1 mb-5">Use the dedicated areas below for access management, people actions and reporting.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <AdminLink href="/admin/roles" title="Roles & Access" description="Manage roles and departments." primary />
+            <AdminLink href="/employees" title="People" description="Search and manage employees and managers." />
+            <AdminLink href="/approvals" title={`PER Approvals (${pendingPER ?? 0})`} description="Review submitted PER objectives." />
+            <AdminLink href="/reports" title="Reports" description="View PER and exam reporting." />
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 }
-function AdminStatCard({ label, value }: { label: string; value: number }) { return <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant mb-1">{label}</p><p className="text-3xl font-extrabold text-primary">{value}</p></div>; }
-function StatusChart({ title, counts, statuses }: { title: string; counts: Record<string, number>; statuses: string[] }) { const max = Math.max(1, ...statuses.map((status) => counts[status] ?? 0)); return <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold text-on-surface mb-5">{title}</h2><div className="space-y-4">{statuses.map((status) => { const count = counts[status] ?? 0; return <div key={status}><div className="flex justify-between text-xs mb-1"><span className="capitalize">{status.replaceAll("_", " ")}</span><span className="font-semibold">{count}</span></div><div className="h-3 rounded-full bg-surface-container overflow-hidden"><div className="h-full bg-primary" style={{ width: `${(count / max) * 100}%` }} /></div></div>; })}</div></section>; }
+
+function AdminStatCard({ label, value }: { label: string; value: number }) {
+  return <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant mb-1">{label}</p><p className="text-3xl font-extrabold text-primary">{value}</p></div>;
+}
+
+function AdminLink({ href, title, description, primary = false }: { href: string; title: string; description: string; primary?: boolean }) {
+  return <Link href={href} className={`rounded-lg border p-4 transition hover:-translate-y-0.5 ${primary ? "border-primary bg-primary text-on-primary" : "border-outline-variant bg-surface-container-lowest"}`}><p className="text-sm font-semibold">{title}</p><p className={`text-xs mt-1 ${primary ? "opacity-90" : "text-on-surface-variant"}`}>{description}</p></Link>;
+}

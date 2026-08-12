@@ -8,10 +8,44 @@ type Props = {
   placeholder?: string;
 };
 
+function previewHtml(html: string) {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html || "", "text/html");
+  const allowed = new Set(["P", "BR", "STRONG", "B", "EM", "I", "U", "S", "UL", "OL", "LI", "H2", "H3", "H4", "BLOCKQUOTE", "A", "IMG"]);
+
+  doc.body.querySelectorAll("*").forEach((el) => {
+    if (!allowed.has(el.tagName)) {
+      el.replaceWith(...Array.from(el.childNodes));
+      return;
+    }
+
+    Array.from(el.attributes).forEach((attr) => {
+      if (el.tagName === "A" && attr.name === "href" && /^https?:\/\//i.test(attr.value)) return;
+      if (el.tagName === "IMG" && ["src", "alt", "width", "height"].includes(attr.name)) return;
+      el.removeAttribute(attr.name);
+    });
+
+    if (el.tagName === "A") {
+      el.setAttribute("target", "_blank");
+      el.setAttribute("rel", "noopener noreferrer");
+    }
+
+    if (el.tagName === "IMG") {
+      const src = el.getAttribute("src") || "";
+      if (!src.startsWith("https://") && !src.startsWith("http://") && !src.startsWith("data:image/")) {
+        el.remove();
+      }
+    }
+  });
+
+  return doc.body.innerHTML;
+}
+
 export default function RichTextEditor({ value, onChange, placeholder = "Write your update..." }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [showHtml, setShowHtml] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -36,6 +70,10 @@ export default function RichTextEditor({ value, onChange, placeholder = "Write y
   const addImageUrl = () => {
     const url = window.prompt("Enter image URL");
     if (!url) return;
+    if (!/^https?:\/\//i.test(url)) {
+      window.alert("Please enter a valid http:// or https:// image URL.");
+      return;
+    }
     editorRef.current?.focus();
     document.execCommand("insertHTML", false, `<img src="${url.replace(/"/g, "&quot;")}" alt="Announcement image" style="max-width:100%;height:auto;border-radius:8px;margin:12px 0" />`);
     sync();
@@ -71,6 +109,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Write y
   );
 
   const divider = <span className="mx-0.5 h-6 w-px bg-outline-variant" />;
+  const renderedPreview = previewHtml(value);
 
   return (
     <div className="rounded-lg border border-outline-variant overflow-hidden bg-background shadow-sm">
@@ -110,19 +149,38 @@ export default function RichTextEditor({ value, onChange, placeholder = "Write y
         {button("Undo", () => command("undo"), "↶")}
         {button("Redo", () => command("redo"), "↷")}
         {button("Clear formatting", () => command("removeFormat"), "Tx")}
-        {button(showHtml ? "Visual editor" : "HTML", () => setShowHtml((v) => !v), "<>" , "ml-auto")}
+        {button(showPreview ? "Hide preview" : "Live preview", () => setShowPreview((v) => !v), showPreview ? "◀" : "▶", "ml-auto")}
+        {button(showHtml ? "Visual editor" : "HTML", () => setShowHtml((v) => !v), "<>")}
       </div>
 
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) insertImageFile(file); e.currentTarget.value = ""; }} />
 
-      {showHtml ? (
-        <textarea value={value} onChange={(e) => onChange(e.target.value)} className="w-full min-h-48 p-4 text-xs font-mono bg-background outline-none" aria-label="HTML editor" />
-      ) : (
-        <div ref={editorRef} contentEditable suppressContentEditableWarning data-placeholder={placeholder} onInput={sync} className="min-h-52 max-h-[500px] overflow-y-auto px-4 py-3 text-sm outline-none prose prose-sm max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-on-surface-variant [&_img]:max-w-full [&_img]:h-auto [&_a]:text-primary [&_blockquote]:border-l-4 [&_blockquote]:pl-3" />
-      )}
+      <div className={showPreview ? "grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-outline-variant" : "block"}>
+        <div>
+          <div className="px-3 py-2 border-b border-outline-variant bg-surface-container/40 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
+            Editor
+          </div>
+          {showHtml ? (
+            <textarea value={value} onChange={(e) => onChange(e.target.value)} className="w-full min-h-52 max-h-[500px] p-4 text-xs font-mono bg-background outline-none resize-y" aria-label="HTML editor" />
+          ) : (
+            <div ref={editorRef} contentEditable suppressContentEditableWarning data-placeholder={placeholder} onInput={sync} className="min-h-52 max-h-[500px] overflow-y-auto px-4 py-3 text-sm outline-none prose prose-sm max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-on-surface-variant [&_img]:max-w-full [&_img]:h-auto [&_a]:text-primary [&_blockquote]:border-l-4 [&_blockquote]:pl-3" />
+          )}
+        </div>
+
+        {showPreview && (
+          <div className="bg-background">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-outline-variant bg-surface-container/40">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">Live preview</span>
+              <span className="text-[10px] text-on-surface-variant">Updates as you type</span>
+            </div>
+            <div className="min-h-52 max-h-[500px] overflow-y-auto px-4 py-3 prose prose-sm max-w-none [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-3 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:pl-3" dangerouslySetInnerHTML={{ __html: renderedPreview || `<p class=\"text-on-surface-variant\">${placeholder}</p>` }} />
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between gap-3 px-3 py-2 text-[11px] text-on-surface-variant border-t border-outline-variant bg-surface-container/40">
         <span>Rich formatting, links, lists, headings and images.</span>
-        <span>Image limit: 2 MB</span>
+        <span>Live preview • Image limit: 2 MB</span>
       </div>
     </div>
   );

@@ -46,5 +46,4 @@ export default async function EmployeesPage() {
     <EmployeeDirectory employees={employeeRows} isAdmin={profile.role === "admin"} />
   </main></div>;
 }
-
 function StatCard({ label, value }: { label: string; value: number }) { return <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">{label}</p><p className="text-3xl font-extrabold text-primary mt-1">{value}</p></div>; }

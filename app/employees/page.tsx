@@ -38,11 +38,7 @@ export default async function EmployeesPage() {
     employeeQuery = employeeQuery.eq("manager_id", profile.id);
   }
 
-  const {
-    data: employees,
-    error: employeesError,
-  } = await employeeQuery;
-
+  const { data: employees, error: employeesError } = await employeeQuery;
   const employeeList = employees ?? [];
   const employeeIds = employeeList.map((employee) => employee.id);
 
@@ -83,8 +79,7 @@ export default async function EmployeesPage() {
     ).length;
     const passedExams = employeeExams.filter(
       (item) =>
-        item.status === "passed" ||
-        item.result?.toLowerCase() === "pass"
+        item.status === "passed" || item.result?.toLowerCase() === "pass"
     ).length;
 
     return {
@@ -141,9 +136,7 @@ export default async function EmployeesPage() {
 
         {employeesError && (
           <div className="mb-6 rounded-lg border border-error/30 bg-error-container/40 px-4 py-3">
-            <p className="text-sm font-semibold text-error">
-              Could not load employees.
-            </p>
+            <p className="text-sm font-semibold text-error">Could not load employees.</p>
             <p className="text-xs text-error mt-1">{employeesError.message}</p>
           </div>
         )}
@@ -159,9 +152,7 @@ export default async function EmployeesPage() {
           {employeeRows.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="text-sm font-semibold text-on-surface">
-                {profile.role === "manager"
-                  ? "No direct reports assigned yet."
-                  : "No employees found."}
+                {profile.role === "manager" ? "No direct reports assigned yet." : "No employees found."}
               </p>
               <p className="text-xs text-on-surface-variant mt-2">
                 {profile.role === "manager"
@@ -189,68 +180,40 @@ export default async function EmployeesPage() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           {employee.avatar_url ? (
-                            <img
-                              src={employee.avatar_url}
-                              alt=""
-                              className="w-9 h-9 rounded-full object-cover"
-                            />
+                            <img src={employee.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
                           ) : (
                             <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-xs font-bold text-on-surface-variant">
                               {getInitials(employee.first_name, employee.last_name)}
                             </div>
                           )}
                           <div>
-                            <p className="font-semibold text-on-surface">
-                              {employee.first_name} {employee.last_name}
-                            </p>
-                            <p className="text-xs text-on-surface-variant">
-                              {employee.email}
-                            </p>
+                            <p className="font-semibold text-on-surface">{employee.first_name} {employee.last_name}</p>
+                            <p className="text-xs text-on-surface-variant">{employee.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-on-surface-variant">
-                        {employee.department || "—"}
-                      </td>
+                      <td className="px-5 py-4 text-on-surface-variant">{employee.department || "—"}</td>
                       <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex text-xs font-semibold px-2 py-1 rounded-full capitalize ${
-                            employee.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : employee.status === "pending"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-surface-container text-on-surface-variant"
-                          }`}
-                        >
+                        <span className={`inline-flex text-xs font-semibold px-2 py-1 rounded-full capitalize ${employee.status === "active" ? "bg-green-100 text-green-800" : employee.status === "pending" ? "bg-amber-100 text-amber-800" : "bg-surface-container text-on-surface-variant"}`}>
                           {employee.status}
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <ProgressMini
-                          completed={employee.approvedPER}
-                          total={TOTAL_OBJECTIVES}
-                          percentage={employee.perProgress}
-                        />
+                        <ProgressMini completed={employee.approvedPER} total={TOTAL_OBJECTIVES} percentage={employee.perProgress} />
                       </td>
                       <td className="px-5 py-4">
-                        <ProgressMini
-                          completed={employee.passedExams}
-                          total={TOTAL_EXAMS}
-                          percentage={employee.examProgress}
-                        />
+                        <ProgressMini completed={employee.passedExams} total={TOTAL_EXAMS} percentage={employee.examProgress} />
                       </td>
                       <td className="px-5 py-4">
                         {employee.pendingPER > 0 ? (
-                          <span className="inline-flex text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
-                            {employee.pendingPER}
-                          </span>
+                          <span className="inline-flex text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">{employee.pendingPER}</span>
                         ) : (
                           <span className="text-xs text-on-surface-variant">—</span>
                         )}
                       </td>
                       <td className="px-5 py-4">
                         <Link
-                          href={`/employees/${employee.id}`}
+                          href={`/employee/${employee.id}`}
                           className="text-xs font-semibold text-primary hover:underline whitespace-nowrap"
                         >
                           View profile →
@@ -268,21 +231,11 @@ export default async function EmployeesPage() {
   );
 }
 
-function ProgressMini({
-  completed,
-  total,
-  percentage,
-}: {
-  completed: number;
-  total: number;
-  percentage: number;
-}) {
+function ProgressMini({ completed, total, percentage }: { completed: number; total: number; percentage: number }) {
   return (
     <div className="min-w-[120px]">
       <div className="flex justify-between text-xs mb-1">
-        <span className="text-on-surface-variant">
-          {completed}/{total}
-        </span>
+        <span className="text-on-surface-variant">{completed}/{total}</span>
         <span className="font-semibold text-primary">{percentage}%</span>
       </div>
       <div className="h-2 bg-surface-container rounded-full overflow-hidden">
@@ -295,9 +248,7 @@ function ProgressMini({
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
-      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-        {label}
-      </p>
+      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">{label}</p>
       <p className="text-3xl font-extrabold text-primary mt-1">{value}</p>
     </div>
   );

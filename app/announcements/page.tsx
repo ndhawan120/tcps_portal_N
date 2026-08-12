@@ -32,6 +32,7 @@ export default async function AnnouncementsPage() {
   }));
 
   const canPost = profile?.role === "manager" || profile?.role === "admin";
+  const isAdmin = profile?.role === "admin";
 
   return (
     <div>
@@ -39,8 +40,7 @@ export default async function AnnouncementsPage() {
       <main className="max-w-3xl mx-auto px-6 py-8">
         <h1 className="text-2xl font-bold text-on-surface mb-1">Updates</h1>
         <p className="text-sm text-on-surface-variant mb-6">
-          News and updates from TC Group management — exam deadlines, ACCA
-          announcements, and general tips.
+          News and updates from TC Group management — exam deadlines, ACCA announcements, and general tips.
         </p>
 
         {canPost && <PostAnnouncementForm userId={user.id} />}
@@ -48,7 +48,8 @@ export default async function AnnouncementsPage() {
         <AnnouncementsList
           announcements={announcements}
           currentUserId={user.id}
-          canDeleteAny={profile?.role === "admin"}
+          canEditAny={isAdmin}
+          canDeleteAny={isAdmin}
         />
       </main>
     </div>

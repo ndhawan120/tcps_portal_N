@@ -13,7 +13,9 @@ export default async function EmployeesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -25,138 +27,174 @@ export default async function EmployeesPage() {
     redirect("/login");
   }
 
-  // Only Admin and Manager can access this page.
-  if (profile.role !== "admin" && profile.role !== "manager") {
+  /*
+   * Only Admins and Managers can access this page.
+   */
+  if (
+    profile.role !== "admin" &&
+    profile.role !== "manager"
+  ) {
     redirect("/dashboard");
   }
 
   /*
-   * ADMIN:
-   * See every employee.
+   * ADMIN
    *
-   * MANAGER:
-   * See only employees whose manager_id is the
-   * currently logged-in manager.
+   * Admin sees every employee.
+   *
+   * MANAGER
+   *
+   * Manager sees only employees whose manager_id
+   * is the currently logged-in manager.
    */
-  let usersQuery = supabase
+  let employeeQuery = supabase
     .from("profiles")
-    .select(
-      `
-        id,
-        first_name,
-        last_name,
-        email,
-        role,
-        department,
-        manager_id,
-        status,
-        created_at,
-        joining_date,
-        job_title,
-        profile_image_url
-      `
-    )
-    .order("last_name", { ascending: true });
+    .select("*")
+    .eq("role", "employee")
+    .order("last_name", {
+      ascending: true,
+    });
 
   if (profile.role === "manager") {
-    usersQuery = usersQuery.eq("manager_id", user.id);
+    employeeQuery = employeeQuery.eq(
+      "manager_id",
+      profile.id
+    );
   }
 
-  const { data: users, error: usersError } = await usersQuery;
+  const {
+    data: employees,
+    error: employeesError,
+  } = await employeeQuery;
 
-  if (usersError) {
-    console.error("Employees query failed:", usersError);
+  if (employeesError) {
+    console.error(
+      "Employees query failed:",
+      employeesError
+    );
   }
 
-  const employeeUsers = (users ?? []).filter(
-    (employee) => employee.id !== user.id
+  const employeeList = employees ?? [];
+
+  /*
+   * Get all PER data.
+   */
+  const { data: objectives } = await supabase
+    .from("per_objectives")
+    .select(
+      "user_id, objective_number, status"
+    );
+
+  /*
+   * Get all exam data.
+   */
+  const { data: exams } = await supabase
+    .from("exams")
+    .select(
+      "user_id, exam_module, status, result"
+    );
+
+  /*
+   * Create quick lookup maps.
+   */
+  const objectivesByUser: Record<
+    string,
+    any[]
+  > = {};
+
+  for (const objective of objectives ?? []) {
+    if (!objectivesByUser[objective.user_id]) {
+      objectivesByUser[objective.user_id] = [];
+    }
+
+    objectivesByUser[objective.user_id].push(
+      objective
+    );
+  }
+
+  const examsByUser: Record<
+    string,
+    any[]
+  > = {};
+
+  for (const exam of exams ?? []) {
+    if (!examsByUser[exam.user_id]) {
+      examsByUser[exam.user_id] = [];
+    }
+
+    examsByUser[exam.user_id].push(exam);
+  }
+
+  /*
+   * Build employee statistics.
+   */
+  const employeeRows = employeeList.map(
+    (employee) => {
+      const employeeObjectives =
+        objectivesByUser[employee.id] ?? [];
+
+      const employeeExams =
+        examsByUser[employee.id] ?? [];
+
+      const approvedPER =
+        employeeObjectives.filter(
+          (item) =>
+            item.status === "approved"
+        ).length;
+
+      const pendingPER =
+        employeeObjectives.filter(
+          (item) =>
+            item.status ===
+            "pending_approval"
+        ).length;
+
+      const passedExams =
+        employeeExams.filter(
+          (item) =>
+            item.status === "passed" ||
+            item.result?.toLowerCase() ===
+              "pass"
+        ).length;
+
+      const perProgress = Math.round(
+        (approvedPER /
+          TOTAL_OBJECTIVES) *
+          100
+      );
+
+      const examProgress = Math.round(
+        (passedExams /
+          TOTAL_EXAMS) *
+          100
+      );
+
+      return {
+        ...employee,
+        approvedPER,
+        pendingPER,
+        passedExams,
+        perProgress,
+        examProgress,
+      };
+    }
   );
 
-  const employeeIds = employeeUsers.map((employee) => employee.id);
+  const totalEmployees =
+    employeeRows.length;
 
-  /*
-   * Get PER data for all visible employees.
-   */
-  const { data: objectives } =
-    employeeIds.length > 0
-      ? await supabase
-          .from("per_objectives")
-          .select("user_id, objective_number, status")
-          .in("user_id", employeeIds)
-      : { data: [] };
-
-  /*
-   * Get exam data for all visible employees.
-   */
-  const { data: exams } =
-    employeeIds.length > 0
-      ? await supabase
-          .from("exams")
-          .select("user_id, exam_module, status, result")
-          .in("user_id", employeeIds)
-      : { data: [] };
-
-  /*
-   * Build progress information per employee.
-   */
-  const employeeStats = employeeUsers.map((employee) => {
-    const employeeObjectives = (objectives ?? []).filter(
-      (objective) => objective.user_id === employee.id
-    );
-
-    const employeeExams = (exams ?? []).filter(
-      (exam) => exam.user_id === employee.id
-    );
-
-    const approvedObjectives = employeeObjectives.filter(
-      (objective) => objective.status === "approved"
+  const activeEmployees =
+    employeeRows.filter(
+      (employee) =>
+        employee.status === "active"
     ).length;
 
-    const passedExams = employeeExams.filter(
-      (exam) =>
-        exam.status === "passed" ||
-        exam.result?.toLowerCase() === "pass"
-    ).length;
-
-    const pendingObjectives = employeeObjectives.filter(
-      (objective) => objective.status === "pending_approval"
-    ).length;
-
-    const rejectedObjectives = employeeObjectives.filter(
-      (objective) => objective.status === "rejected"
-    ).length;
-
-    const perProgress = Math.min(
-      100,
-      Math.round((approvedObjectives / TOTAL_OBJECTIVES) * 100)
+  const pendingPERApprovals =
+    employeeRows.reduce(
+      (total, employee) =>
+        total + employee.pendingPER,
+      0
     );
-
-    const examProgress = Math.min(
-      100,
-      Math.round((passedExams / TOTAL_EXAMS) * 100)
-    );
-
-    return {
-      ...employee,
-      approvedObjectives,
-      passedExams,
-      pendingObjectives,
-      rejectedObjectives,
-      perProgress,
-      examProgress,
-    };
-  });
-
-  const totalEmployees = employeeStats.length;
-
-  const pendingApprovals = employeeStats.reduce(
-    (total, employee) => total + employee.pendingObjectives,
-    0
-  );
-
-  const activeEmployees = employeeStats.filter(
-    (employee) => employee.status === "active"
-  ).length;
 
   return (
     <div>
@@ -168,82 +206,112 @@ export default async function EmployeesPage() {
       />
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
+
+        {/* HEADER */}
+
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+
           <div>
             <h1 className="text-2xl font-bold text-on-surface">
-              {profile.role === "manager"
-                ? "My Team"
-                : "Employees"}
+              Employees
             </h1>
 
             <p className="text-sm text-on-surface-variant mt-1">
-              {profile.role === "manager"
-                ? "View the progress and performance of your team members."
-                : "View and manage employee information and progress."}
+              View employee information and
+              progress.
             </p>
           </div>
 
           <a
             href="/employees/export"
-            className="inline-flex items-center justify-center text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary hover:opacity-90"
+            className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-primary text-on-primary text-sm font-semibold hover:opacity-90"
           >
             Download Excel
           </a>
+
         </div>
 
-        {/* Summary cards */}
+        {/* STAT CARDS */}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <SummaryCard
+
+          <StatCard
             label="Total Employees"
-            value={String(totalEmployees)}
+            value={totalEmployees}
           />
 
-          <SummaryCard
+          <StatCard
             label="Active Employees"
-            value={String(activeEmployees)}
+            value={activeEmployees}
           />
 
-          <SummaryCard
+          <StatCard
             label="Pending PER Approvals"
-            value={String(pendingApprovals)}
+            value={pendingPERApprovals}
           />
+
         </div>
 
-        {/* Employee table */}
+        {/* ERROR */}
+
+        {employeesError && (
+          <div className="mb-6 rounded-lg border border-error/30 bg-error-container/40 px-4 py-3">
+            <p className="text-sm font-semibold text-error">
+              Could not load employees.
+            </p>
+
+            <p className="text-xs text-error mt-1">
+              {employeesError.message}
+            </p>
+          </div>
+        )}
+
+        {/* DIRECTORY */}
+
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+
           <div className="px-5 py-5 border-b border-outline-variant">
+
             <h2 className="text-lg font-bold text-on-surface">
-              {profile.role === "manager"
-                ? "Team Members"
-                : "Employee Directory"}
+              Employee Directory
             </h2>
 
             <p className="text-xs text-on-surface-variant mt-1">
               {totalEmployees} employee
-              {totalEmployees === 1 ? "" : "s"} found
+              {totalEmployees === 1
+                ? ""
+                : "s"} found
             </p>
+
           </div>
 
-          {employeeStats.length === 0 ? (
-            <div className="px-5 py-12 text-center">
-              <p className="text-sm font-medium text-on-surface">
-                {profile.role === "manager"
-                  ? "No team members assigned."
-                  : "No employees found."}
+          {employeeRows.length === 0 ? (
+
+            <div className="px-6 py-12 text-center">
+
+              <p className="text-sm font-semibold text-on-surface">
+                No employees found.
               </p>
 
-              {profile.role === "manager" && (
-                <p className="text-xs text-on-surface-variant mt-1">
-                  Employees assigned to you will appear here.
-                </p>
-              )}
+              <p className="text-xs text-on-surface-variant mt-2">
+                Check that your employee accounts
+                have the role set to
+                <strong> employee </strong>
+                in the profiles table.
+              </p>
+
             </div>
+
           ) : (
+
             <div className="overflow-x-auto">
+
               <table className="w-full text-sm">
-                <thead className="bg-surface-container text-on-surface-variant text-xs uppercase font-semibold">
+
+                <thead className="bg-surface-container text-xs uppercase text-on-surface-variant">
+
                   <tr>
+
                     <th className="text-left px-5 py-3">
                       Employee
                     </th>
@@ -256,12 +324,12 @@ export default async function EmployeesPage() {
                       Status
                     </th>
 
-                    <th className="text-left px-5 py-3 min-w-[190px]">
-                      PER Progress
+                    <th className="text-left px-5 py-3">
+                      PER
                     </th>
 
-                    <th className="text-left px-5 py-3 min-w-[190px]">
-                      Exam Progress
+                    <th className="text-left px-5 py-3">
+                      Exams
                     </th>
 
                     <th className="text-left px-5 py-3">
@@ -269,199 +337,257 @@ export default async function EmployeesPage() {
                     </th>
 
                     <th className="text-left px-5 py-3">
-                      Action
                     </th>
+
                   </tr>
+
                 </thead>
 
                 <tbody className="divide-y divide-outline-variant">
-                  {employeeStats.map((employee) => (
-                    <tr
-                      key={employee.id}
-                      className="hover:bg-surface-container/40"
-                    >
-                      {/* Employee */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          {employee.profile_image_url ? (
-                            <img
-                              src={employee.profile_image_url}
-                              alt=""
-                              className="w-9 h-9 rounded-full object-cover border border-outline-variant"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-xs font-bold text-on-surface-variant">
-                              {getInitials(
-                                employee.first_name,
-                                employee.last_name
-                              )}
+
+                  {employeeRows.map(
+                    (employee) => (
+
+                      <tr
+                        key={employee.id}
+                        className="hover:bg-surface-container-low"
+                      >
+
+                        {/* NAME */}
+
+                        <td className="px-5 py-4">
+
+                          <div className="flex items-center gap-3">
+
+                            {employee.profile_image_url ? (
+
+                              <img
+                                src={
+                                  employee.profile_image_url
+                                }
+                                alt=""
+                                className="w-9 h-9 rounded-full object-cover"
+                              />
+
+                            ) : (
+
+                              <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-xs font-bold text-on-surface-variant">
+
+                                {getInitials(
+                                  employee.first_name,
+                                  employee.last_name
+                                )}
+
+                              </div>
+
+                            )}
+
+                            <div>
+
+                              <p className="font-semibold text-on-surface">
+                                {
+                                  employee.first_name
+                                }{" "}
+                                {
+                                  employee.last_name
+                                }
+                              </p>
+
+                              <p className="text-xs text-on-surface-variant">
+                                {
+                                  employee.email
+                                }
+                              </p>
+
                             </div>
+
+                          </div>
+
+                        </td>
+
+                        {/* DEPARTMENT */}
+
+                        <td className="px-5 py-4 text-on-surface-variant">
+                          {employee.department ||
+                            "—"}
+                        </td>
+
+                        {/* STATUS */}
+
+                        <td className="px-5 py-4">
+
+                          <span
+                            className={`inline-flex text-xs font-semibold px-2 py-1 rounded-full capitalize ${
+                              employee.status ===
+                              "active"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-surface-container text-on-surface-variant"
+                            }`}
+                          >
+                            {
+                              employee.status
+                            }
+                          </span>
+
+                        </td>
+
+                        {/* PER */}
+
+                        <td className="px-5 py-4">
+
+                          <div className="min-w-[120px]">
+
+                            <div className="flex justify-between text-xs mb-1">
+
+                              <span className="text-on-surface-variant">
+                                {
+                                  employee.approvedPER
+                                }
+                                /
+                                {
+                                  TOTAL_OBJECTIVES
+                                }
+                              </span>
+
+                              <span className="font-semibold text-primary">
+                                {
+                                  employee.perProgress
+                                }%
+                              </span>
+
+                            </div>
+
+                            <div className="h-2 bg-surface-container rounded-full overflow-hidden">
+
+                              <div
+                                className="h-full bg-primary rounded-full"
+                                style={{
+                                  width: `${employee.perProgress}%`,
+                                }}
+                              />
+
+                            </div>
+
+                          </div>
+
+                        </td>
+
+                        {/* EXAMS */}
+
+                        <td className="px-5 py-4">
+
+                          <div className="min-w-[120px]">
+
+                            <div className="flex justify-between text-xs mb-1">
+
+                              <span className="text-on-surface-variant">
+                                {
+                                  employee.passedExams
+                                }
+                                /
+                                {
+                                  TOTAL_EXAMS
+                                }
+                              </span>
+
+                              <span className="font-semibold text-primary">
+                                {
+                                  employee.examProgress
+                                }%
+                              </span>
+
+                            </div>
+
+                            <div className="h-2 bg-surface-container rounded-full overflow-hidden">
+
+                              <div
+                                className="h-full bg-primary rounded-full"
+                                style={{
+                                  width: `${employee.examProgress}%`,
+                                }}
+                              />
+
+                            </div>
+
+                          </div>
+
+                        </td>
+
+                        {/* PENDING */}
+
+                        <td className="px-5 py-4">
+
+                          {employee.pendingPER >
+                          0 ? (
+
+                            <span className="inline-flex text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
+                              {
+                                employee.pendingPER
+                              }
+                            </span>
+
+                          ) : (
+
+                            <span className="text-xs text-on-surface-variant">
+                              —
+                            </span>
+
                           )}
 
-                          <div>
-                            <p className="font-semibold text-on-surface whitespace-nowrap">
-                              {employee.first_name}{" "}
-                              {employee.last_name}
-                            </p>
+                        </td>
 
-                            <p className="text-xs text-on-surface-variant">
-                              {employee.email}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
+                        {/* VIEW */}
 
-                      {/* Department */}
-                      <td className="px-5 py-4 text-on-surface-variant whitespace-nowrap">
-                        {employee.department || "—"}
-                      </td>
+                        <td className="px-5 py-4">
 
-                      {/* Status */}
-                      <td className="px-5 py-4">
-                        <StatusBadge
-                          status={employee.status}
-                        />
-                      </td>
+                          <Link
+                            href={`/employees/${employee.id}`}
+                            className="text-xs font-semibold text-primary hover:underline whitespace-nowrap"
+                          >
+                            View profile →
+                          </Link>
 
-                      {/* PER */}
-                      <td className="px-5 py-4">
-                        <div className="w-full max-w-[180px]">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-on-surface-variant">
-                              {employee.approvedObjectives}/
-                              {TOTAL_OBJECTIVES}
-                            </span>
+                        </td>
 
-                            <span className="font-semibold text-on-surface">
-                              {employee.perProgress}%
-                            </span>
-                          </div>
+                      </tr>
 
-                          <div className="h-2 bg-surface-container rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all"
-                              style={{
-                                width: `${employee.perProgress}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </td>
+                    )
+                  )}
 
-                      {/* Exams */}
-                      <td className="px-5 py-4">
-                        <div className="w-full max-w-[180px]">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-on-surface-variant">
-                              {employee.passedExams}/
-                              {TOTAL_EXAMS}
-                            </span>
-
-                            <span className="font-semibold text-on-surface">
-                              {employee.examProgress}%
-                            </span>
-                          </div>
-
-                          <div className="h-2 bg-surface-container rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all"
-                              style={{
-                                width: `${employee.examProgress}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Pending */}
-                      <td className="px-5 py-4">
-                        {employee.pendingObjectives > 0 ? (
-                          <span className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
-                            {employee.pendingObjectives} pending
-                          </span>
-                        ) : (
-                          <span className="text-xs text-on-surface-variant">
-                            None
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Action */}
-                      <td className="px-5 py-4">
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="text-xs font-semibold text-primary hover:underline whitespace-nowrap"
-                        >
-                          View profile →
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
                 </tbody>
+
               </table>
+
             </div>
+
           )}
+
         </div>
+
       </main>
     </div>
   );
 }
 
-function SummaryCard({
+function StatCard({
   label,
   value,
 }: {
   label: string;
-  value: string;
+  value: number;
 }) {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
-      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant mb-1">
+
+      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
         {label}
       </p>
 
-      <p className="text-3xl font-extrabold text-primary">
+      <p className="text-3xl font-extrabold text-primary mt-1">
         {value}
       </p>
+
     </div>
-  );
-}
-
-function StatusBadge({
-  status,
-}: {
-  status: string | null;
-}) {
-  const normalized = status?.toLowerCase() ?? "unknown";
-
-  const label =
-    normalized === "active"
-      ? "Active"
-      : normalized === "pending"
-      ? "Pending"
-      : normalized === "rejected"
-      ? "Rejected"
-      : normalized === "inactive"
-      ? "Inactive"
-      : normalized.replace("_", " ");
-
-  const className =
-    normalized === "active"
-      ? "bg-green-100 text-green-800"
-      : normalized === "pending"
-      ? "bg-amber-100 text-amber-800"
-      : normalized === "rejected"
-      ? "bg-red-100 text-red-800"
-      : normalized === "inactive"
-      ? "bg-surface-container text-on-surface-variant"
-      : "bg-surface-container text-on-surface-variant";
-
-  return (
-    <span
-      className={`inline-flex text-xs font-semibold px-2 py-1 rounded-full capitalize ${className}`}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -469,8 +595,13 @@ function getInitials(
   firstName: string | null,
   lastName: string | null
 ) {
-  const first = firstName?.trim()?.charAt(0) ?? "";
-  const last = lastName?.trim()?.charAt(0) ?? "";
+  const first =
+    firstName?.trim()?.charAt(0) ?? "";
 
-  return `${first}${last}`.toUpperCase() || "U";
+  const last =
+    lastName?.trim()?.charAt(0) ?? "";
+
+  return (
+    `${first}${last}`.toUpperCase() || "U"
+  );
 }

@@ -6,6 +6,7 @@ import AddUserModal from "./AddUserModal";
 import RegistrationApproval from "./RegistrationApproval";
 import RealtimeRefresh from "@/components/RealtimeRefresh";
 import PeopleAccess from "./PeopleAccess";
+import RoleManager from "./RoleManager";
 
 const PER_STATUSES = ["not_started", "draft", "pending_approval", "approved", "rejected"];
 const EXAM_STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"];
@@ -49,14 +50,10 @@ export default async function AdminPage() {
       <RegistrationApproval />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"><StatusChart title="PER Objective Status" counts={perCounts} statuses={PER_STATUSES} /><StatusChart title="Exam Status" counts={examCounts} statuses={EXAM_STATUSES} /></div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><StatusChart title="Exam Result" counts={resultCounts} statuses={EXAM_RESULTS} /><section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold text-on-surface mb-2">Approval Workflow</h2><p className="text-sm text-on-surface-variant mb-4">Submitted PER objectives appear in the approval queue. Managers see only their direct reports; admins can review all employee submissions.</p><div className="flex flex-wrap gap-2"><Link href="/approvals" className="text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary">Open PER Approvals ({pendingPER})</Link><Link href="/employees" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant">Employee Directory</Link></div></section></div>
-
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-        <div className="px-5 pt-5 pb-4"><h2 className="text-lg font-bold text-on-surface">People & Access</h2><p className="text-xs text-on-surface-variant mt-1">Search employees and managers, filter by access role or status, and manage department, role, manager and account status.</p></div>
-        <PeopleAccess people={people} managers={managers} />
-      </div>
+      <RoleManager />
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden"><div className="px-5 pt-5 pb-4"><h2 className="text-lg font-bold text-on-surface">People & Access</h2><p className="text-xs text-on-surface-variant mt-1">Search employees and managers, filter by access role or status, and manage department, role, manager and account status.</p></div><PeopleAccess people={people} managers={managers} /></div>
     </main>
   </div>;
 }
-
 function AdminStatCard({ label, value }: { label: string; value: number }) { return <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant mb-1">{label}</p><p className="text-3xl font-extrabold text-primary">{value}</p></div>; }
 function StatusChart({ title, counts, statuses }: { title: string; counts: Record<string, number>; statuses: string[] }) { const max = Math.max(1, ...statuses.map((status) => counts[status] ?? 0)); return <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold text-on-surface mb-5">{title}</h2><div className="space-y-4">{statuses.map((status) => { const count = counts[status] ?? 0; return <div key={status}><div className="flex justify-between text-xs mb-1"><span className="capitalize">{status.replaceAll("_", " ")}</span><span className="font-semibold">{count}</span></div><div className="h-3 rounded-full bg-surface-container overflow-hidden"><div className="h-full bg-primary" style={{ width: `${(count / max) * 100}%` }} /></div></div>; })}</div></section>; }

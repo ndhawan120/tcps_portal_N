@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DEPARTMENTS } from "@/lib/departments";
 
+const MIN_PASSWORD_LENGTH = 8;
+
 export default function AddUserModal() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"password" | "invite">("invite");
@@ -25,6 +27,7 @@ export default function AddUserModal() {
     setDepartment(DEPARTMENTS[0]);
     setRole("employee");
     setError(null);
+    setMode("invite");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,31 +35,37 @@ export default function AddUserModal() {
     setLoading(true);
     setError(null);
 
-    const res = await fetch("/api/admin/create-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        password: mode === "password" ? password : undefined,
-        firstName,
-        lastName,
-        department,
-        role,
-        sendInvite: mode === "invite",
-      }),
-    });
+    try {
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: mode === "password" ? password : undefined,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          department,
+          role,
+          sendInvite: mode === "invite",
+        }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json().catch(() => ({}));
 
-    if (!res.ok) {
-      setError(data.error ?? "Something went wrong");
-      return;
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong while creating the user.");
+        return;
+      }
+
+      setOpen(false);
+      reset();
+      router.refresh();
+    } catch (requestError) {
+      console.error("Create user request failed:", requestError);
+      setError("Unable to reach the server. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setOpen(false);
-    reset();
-    router.refresh();
   };
 
   return (
@@ -74,8 +83,13 @@ export default function AddUserModal() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-on-surface">Add User</h2>
               <button
-                onClick={() => setOpen(false)}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  reset();
+                }}
                 className="text-on-surface-variant hover:text-on-surface"
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -105,10 +119,11 @@ export default function AddUserModal() {
                 Set password
               </button>
             </div>
+
             <p className="text-xs text-on-surface-variant mb-4">
               {mode === "invite"
                 ? "They'll receive an email to set their own password."
-                : "You choose their password directly \u2014 share it with them yourself."}
+                : "You choose a temporary password directly. Share it securely with them."}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -130,6 +145,7 @@ export default function AddUserModal() {
                   className="flex-1 rounded-md border border-outline-variant px-3 py-2 text-sm"
                 />
               </div>
+
               <input
                 type="email"
                 required
@@ -138,17 +154,24 @@ export default function AddUserModal() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-md border border-outline-variant px-3 py-2 text-sm"
               />
+
               {mode === "password" && (
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  placeholder="Temporary password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-md border border-outline-variant px-3 py-2 text-sm"
-                />
+                <>
+                  <input
+                    type="password"
+                    required
+                    minLength={MIN_PASSWORD_LENGTH}
+                    placeholder="Temporary password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-md border border-outline-variant px-3 py-2 text-sm"
+                  />
+                  <p className="text-[11px] text-on-surface-variant">
+                    Minimum {MIN_PASSWORD_LENGTH} characters.
+                  </p>
+                </>
               )}
+
               <div className="flex gap-3">
                 <select
                   value={department}
@@ -161,6 +184,7 @@ export default function AddUserModal() {
                     </option>
                   ))}
                 </select>
+
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
@@ -171,7 +195,13 @@ export default function AddUserModal() {
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              {error && <p className="text-sm text-error">{error}</p>}
+
+              {error && (
+                <p className="text-sm text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2">
+                  {error}
+                </p>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}

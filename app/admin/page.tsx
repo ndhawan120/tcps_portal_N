@@ -6,7 +6,6 @@ import AddUserModal from "./AddUserModal";
 import RegistrationApproval from "./RegistrationApproval";
 import RealtimeRefresh from "@/components/RealtimeRefresh";
 import PeopleAccess from "./PeopleAccess";
-import RoleManager from "./RoleManager";
 
 const PER_STATUSES = ["not_started", "draft", "pending_approval", "approved", "rejected"];
 const EXAM_STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"];
@@ -37,7 +36,7 @@ export default async function AdminPage() {
   for (const objective of allObjectives ?? []) perCounts[objective.status] = (perCounts[objective.status] ?? 0) + 1;
   for (const exam of allExams ?? []) { examCounts[exam.status] = (examCounts[exam.status] ?? 0) + 1; const result = exam.result ?? "No Result"; resultCounts[result] = (resultCounts[result] ?? 0) + 1; }
 
-  const pendingUsers = employees.filter((u) => u.status === "pending").length;
+  const pendingUsers = users.filter((u) => u.status === "pending").length;
   const activeUsers = employees.filter((u) => u.status === "active").length;
   const pendingPER = perCounts.pending_approval ?? 0;
 
@@ -49,9 +48,12 @@ export default async function AdminPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"><AdminStatCard label="Total Employees" value={employees.length} /><AdminStatCard label="Active Employees" value={activeUsers} /><AdminStatCard label="Pending Signups" value={pendingUsers} /><AdminStatCard label="Pending PER Approvals" value={pendingPER} /></div>
       <RegistrationApproval />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"><StatusChart title="PER Objective Status" counts={perCounts} statuses={PER_STATUSES} /><StatusChart title="Exam Status" counts={examCounts} statuses={EXAM_STATUSES} /></div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><StatusChart title="Exam Result" counts={resultCounts} statuses={EXAM_RESULTS} /><section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold text-on-surface mb-2">Approval Workflow</h2><p className="text-sm text-on-surface-variant mb-4">Submitted PER objectives appear in the approval queue. Managers see only their direct reports; admins can review all employee submissions.</p><div className="flex flex-wrap gap-2"><Link href="/approvals" className="text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary">Open PER Approvals ({pendingPER})</Link><Link href="/employees" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant">Employee Directory</Link></div></section></div>
-      <RoleManager />
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden"><div className="px-5 pt-5 pb-4"><h2 className="text-lg font-bold text-on-surface">People & Access</h2><p className="text-xs text-on-surface-variant mt-1">Search employees and managers, filter by access role or status, and manage department, role, manager and account status.</p></div><PeopleAccess people={people} managers={managers} /></div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><StatusChart title="Exam Result" counts={resultCounts} statuses={EXAM_RESULTS} /><section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold text-on-surface mb-2">Administration</h2><p className="text-sm text-on-surface-variant mb-4">Manage roles and access separately, or open the employee directory for people-level actions.</p><div className="flex flex-wrap gap-2"><Link href="/admin/roles" className="text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary">Roles & Access</Link><Link href="/employees" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant">People & Access</Link><Link href="/approvals" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant">PER Approvals ({pendingPER})</Link></div></section></div>
+
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+        <div className="px-5 pt-5 pb-4"><h2 className="text-lg font-bold text-on-surface">People & Access</h2><p className="text-xs text-on-surface-variant mt-1">Search employees and managers, filter by access role or status, and manage department, role, manager and account status.</p></div>
+        <PeopleAccess people={people} managers={managers} />
+      </div>
     </main>
   </div>;
 }

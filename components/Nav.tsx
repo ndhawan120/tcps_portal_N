@@ -24,7 +24,7 @@ export default function Nav({ role, name }: { role: string; name: string }) {
 
   if (role === "manager" || role === "admin") {
     links.push({ href: "/manager", label: "Team" });
-    links.push({ href: "/manager/approvals", label: "Approvals" });
+    links.push({ href: "/approvals", label: "Approvals" });
     links.push({ href: "/employees", label: role === "manager" ? "My Team" : "Employees" });
   }
 

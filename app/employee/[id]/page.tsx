@@ -43,12 +43,10 @@ export default async function EmployeeDetailsPage({
     notFound();
   }
 
-  // Managers can only see their own team.
-  if (
-    viewer.role === "manager" &&
-    employee.manager_id !== viewer.id
-  ) {
-    redirect("/employee");
+  // Managers can only see employees assigned to them.
+  // Admins can see every employee.
+  if (viewer.role === "manager" && employee.manager_id !== viewer.id) {
+    redirect("/employees");
   }
 
   const [{ data: objectives }, { data: exams }] = await Promise.all([
@@ -84,9 +82,7 @@ export default async function EmployeeDetailsPage({
     (approvedObjectives / TOTAL_OBJECTIVES) * 100
   );
 
-  const examProgress = Math.round(
-    (passedExams / TOTAL_EXAMS) * 100
-  );
+  const examProgress = Math.round((passedExams / TOTAL_EXAMS) * 100);
 
   return (
     <div>
@@ -98,7 +94,7 @@ export default async function EmployeeDetailsPage({
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-6">
           <Link
-            href="/employee"
+            href="/employees"
             className="text-xs font-medium text-primary hover:underline"
           >
             ← Back to Employees
@@ -135,9 +131,7 @@ export default async function EmployeeDetailsPage({
                   <span>
                     Joining Date:{" "}
                     <strong className="text-on-surface">
-                      {new Date(
-                        employee.joining_date
-                      ).toLocaleDateString()}
+                      {new Date(employee.joining_date).toLocaleDateString()}
                     </strong>
                   </span>
                 )}
@@ -145,8 +139,6 @@ export default async function EmployeeDetailsPage({
             </div>
           </div>
         </div>
-
-        {/* Progress cards */}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <ProgressCard
@@ -174,13 +166,9 @@ export default async function EmployeeDetailsPage({
           />
         </div>
 
-        {/* PER */}
-
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-on-surface">
-              PER Objectives
-            </h2>
+            <h2 className="text-lg font-bold text-on-surface">PER Objectives</h2>
           </div>
 
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
@@ -213,12 +201,8 @@ export default async function EmployeeDetailsPage({
           </div>
         </section>
 
-        {/* Exams */}
-
         <section>
-          <h2 className="text-lg font-bold text-on-surface mb-4">
-            Exams
-          </h2>
+          <h2 className="text-lg font-bold text-on-surface mb-4">Exams</h2>
 
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
             {(exams ?? []).length === 0 ? (
@@ -275,13 +259,9 @@ function ProgressCard({
         {label}
       </p>
 
-      <p className="text-3xl font-extrabold text-primary mt-1">
-        {value}
-      </p>
+      <p className="text-3xl font-extrabold text-primary mt-1">{value}</p>
 
-      <p className="text-xs text-on-surface-variant mt-1">
-        {sub}
-      </p>
+      <p className="text-xs text-on-surface-variant mt-1">{sub}</p>
     </div>
   );
 }

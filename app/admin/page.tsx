@@ -2,13 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
-import RoleSelect from "./RoleSelect";
-import DepartmentSelect from "./DepartmentSelect";
-import StatusSelect from "./StatusSelect";
-import ManagerSelect from "./ManagerSelect";
 import AddUserModal from "./AddUserModal";
 import RegistrationApproval from "./RegistrationApproval";
 import RealtimeRefresh from "@/components/RealtimeRefresh";
+import PeopleAccess from "./PeopleAccess";
 
 const PER_STATUSES = ["not_started", "draft", "pending_approval", "approved", "rejected"];
 const EXAM_STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"];
@@ -54,11 +51,8 @@ export default async function AdminPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><StatusChart title="Exam Result" counts={resultCounts} statuses={EXAM_RESULTS} /><section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold text-on-surface mb-2">Approval Workflow</h2><p className="text-sm text-on-surface-variant mb-4">Submitted PER objectives appear in the approval queue. Managers see only their direct reports; admins can review all employee submissions.</p><div className="flex flex-wrap gap-2"><Link href="/approvals" className="text-sm font-semibold px-4 py-2 rounded-md bg-primary text-on-primary">Open PER Approvals ({pendingPER})</Link><Link href="/employees" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant">Employee Directory</Link></div></section></div>
 
       <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-        <div className="px-5 pt-5 pb-4"><h2 className="text-lg font-bold text-on-surface">People & Access</h2><p className="text-xs text-on-surface-variant mt-1">Employees and managers are listed here. The Role column shows the current access level.</p></div>
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-container text-on-surface-variant text-xs uppercase font-semibold"><tr><th className="text-left px-5 py-3">Name</th><th className="text-left px-5 py-3">Email</th><th className="text-left px-5 py-3">Department</th><th className="text-left px-5 py-3">Role</th><th className="text-left px-5 py-3">Manager</th><th className="text-left px-5 py-3">Status</th><th className="px-5 py-3"></th></tr></thead><tbody className="divide-y divide-outline-variant">
-          {people.map((person) => <tr key={person.id}><td className="px-5 py-3 font-medium text-on-surface whitespace-nowrap"><div className="flex items-center gap-2">{person.avatar_url ? <img src={person.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" /> : <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-xs font-bold">{`${person.first_name?.[0] ?? ""}${person.last_name?.[0] ?? ""}`.toUpperCase()}</div>}<span>{person.first_name} {person.last_name}</span></div></td><td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">{person.email}</td><td className="px-5 py-3"><DepartmentSelect userId={person.id} currentDepartment={person.department} /></td><td className="px-5 py-3"><RoleSelect userId={person.id} currentRole={person.role} /></td><td className="px-5 py-3"><ManagerSelect userId={person.id} currentManagerId={person.manager_id} managers={managers} /></td><td className="px-5 py-3"><StatusSelect userId={person.id} currentStatus={person.status} /></td><td className="px-5 py-3"><Link href={`/employees/${person.id}`} className="text-xs font-medium text-primary hover:underline whitespace-nowrap">View profile →</Link></td></tr>)}
-        </tbody></table></div>
-        {people.length === 0 && <div className="p-8 text-center text-sm text-on-surface-variant">No employees or managers found.</div>}
+        <div className="px-5 pt-5 pb-4"><h2 className="text-lg font-bold text-on-surface">People & Access</h2><p className="text-xs text-on-surface-variant mt-1">Search employees and managers, filter by access role or status, and manage department, role, manager and account status.</p></div>
+        <PeopleAccess people={people} managers={managers} />
       </div>
     </main>
   </div>;

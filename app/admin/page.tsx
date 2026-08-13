@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import AddUserModal from "./AddUserModal";
 import RegistrationApproval from "./RegistrationApproval";
+import PeopleAccess from "./PeopleAccess";
 import RealtimeRefresh from "@/components/RealtimeRefresh";
 
 export default async function AdminPage() {
@@ -12,19 +14,110 @@ export default async function AdminPage() {
   if (!user) redirect("/login");
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (profile?.role !== "admin" || profile.status !== "active") redirect("/dashboard");
-  const { data: users } = await supabase.from("profiles").select("id,role,status");
-  const people = users ?? [];
-  const employees = people.filter((u) => u.role === "employee");
-  const pendingUsers = people.filter((u) => u.status === "pending").length;
-  const activeUsers = employees.filter((u) => u.status === "active").length;
-  const { count: pendingPER } = await supabase.from("per_objectives").select("id", { count: "exact", head: true }).eq("status", "pending_approval");
 
-  return <div><RealtimeRefresh /><Nav role="admin" name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} /><main className="max-w-7xl mx-auto px-6 py-8">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6"><div><h1 className="text-2xl font-bold text-on-surface">Admin Panel</h1><p className="text-sm text-on-surface-variant mt-1">Manage people, access, reporting relationships, approvals and company administration.</p></div><div className="flex gap-2"><Link href="/employees" className="text-sm font-medium px-4 py-2 rounded-md border border-outline-variant">View People</Link><AddUserModal /></div></div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"><AdminStatCard label="Total Employees" value={employees.length} /><AdminStatCard label="Active Employees" value={activeUsers} /><AdminStatCard label="Pending Signups" value={pendingUsers} /><AdminStatCard label="Pending PER Approvals" value={pendingPER ?? 0} /></div>
-    <RegistrationApproval />
-    <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 mt-6"><h2 className="text-lg font-bold text-on-surface">Administration</h2><p className="text-sm text-on-surface-variant mt-1 mb-5">Use the dedicated areas below for access management, branding, people actions and reporting.</p><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3"><AdminLink href="/admin/roles" title="Roles & Access" description="Manage roles and departments." primary /><AdminLink href="/admin/branding" title="Branding" description="Upload the TC Professional Services logo." /><AdminLink href="/employees" title="People" description="Search and manage employees and managers." /><AdminLink href="/approvals" title={`PER Approvals (${pendingPER ?? 0})`} description="Review submitted PER objectives." /><AdminLink href="/reports" title="Reports" description="View PER and exam reporting." /></div></section>
-  </main></div>;
+  const { data: users } = await supabase
+    .from("profiles")
+    .select("id,first_name,last_name,email,department,role,custom_role_id,manager_id,status,avatar_url,profile_slug")
+    .order("last_name", { ascending: true });
+  const people = users ?? [];
+  const employeeCount = people.filter((u) => u.role === "employee").length;
+  const activeCount = people.filter((u) => u.status === "active").length;
+  const pendingUsers = people.filter((u) => u.status === "pending").length;
+  const managers = people.filter((u) => u.role === "manager").map((u) => ({ id: u.id, first_name: u.first_name ?? "", last_name: u.last_name ?? "" }));
+
+  const [{ count: pendingPER }, { data: exams }, { data: objectives }] = await Promise.all([
+    supabase.from("per_objectives").select("id", { count: "exact", head: true }).eq("status", "pending_approval"),
+    supabase.from("exams").select("user_id, result, status"),
+    supabase.from("per_objectives").select("user_id, status"),
+  ]);
+
+  const passedExams = (exams ?? []).filter((e) => e.result === "pass").length;
+  const examCount = (exams ?? []).length;
+  const examPassRate = examCount ? Math.round((passedExams / examCount) * 100) : 0;
+  const approvedPER = (objectives ?? []).filter((o) => o.status === "approved").length;
+  const perCount = (objectives ?? []).length;
+  const perApprovalRate = perCount ? Math.round((approvedPER / perCount) * 100) : 0;
+
+  let lastSignIn: Record<string, string | null> = {};
+  try {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (key && url) {
+      const admin = createSupabaseAdmin(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+      const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      for (const authUser of data.users) lastSignIn[authUser.id] = authUser.last_sign_in_at ?? null;
+    }
+  } catch {
+    lastSignIn = {};
+  }
+
+  const peopleWithLogin = people.map((person) => ({ ...person, last_sign_in_at: lastSignIn[person.id] ?? null }));
+
+  const departmentStats = Object.entries(
+    (exams ?? []).reduce<Record<string, { total: number; passed: number }>>((acc, exam) => {
+      const department = people.find((p) => p.id === exam.user_id)?.department || "Other";
+      acc[department] ??= { total: 0, passed: 0 };
+      acc[department].total += 1;
+      if (exam.result === "pass") acc[department].passed += 1;
+      return acc;
+    }, {})
+  )
+    .map(([department, value]) => ({ department, rate: value.total ? Math.round((value.passed / value.total) * 100) : 0 }))
+    .sort((a, b) => b.rate - a.rate)
+    .slice(0, 6);
+
+  return (
+    <div>
+      <RealtimeRefresh />
+      <Nav role="admin" name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-on-surface">User Management</h1>
+            <p className="text-sm text-on-surface-variant mt-1">Manage access, monitor progress and oversee professional development across TC Professional Services.</p>
+          </div>
+          <div className="flex flex-wrap gap-2"><Link href="/employees/export" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant hover:bg-surface-container">Export Data</Link><AddUserModal /></div>
+        </div>
+
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <AdminStatCard label="Total Employees" value={employeeCount} />
+          <AdminStatCard label="Active Employees" value={activeCount} />
+          <AdminStatCard label="Pending Signups" value={pendingUsers} />
+          <AdminStatCard label="Pending PER Approvals" value={pendingPER ?? 0} />
+        </section>
+
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <ProgressCard label="Global PER Approval" value={perApprovalRate} />
+          <ProgressCard label="Exam Pass Rate" value={examPassRate} />
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant mb-3">Pass Rates by Department</p>
+            {departmentStats.length === 0 ? <p className="text-sm text-on-surface-variant">No exam results yet.</p> : <div className="space-y-2">{departmentStats.map((item) => <div key={item.department}><div className="flex justify-between text-xs mb-1"><span className="truncate pr-2">{item.department}</span><span className="font-semibold">{item.rate}%</span></div><div className="h-2 rounded-full bg-surface-container overflow-hidden"><div className="h-full rounded-full bg-primary" style={{ width: `${item.rate}%` }} /></div></div>)}</div>}
+          </div>
+        </section>
+
+        <section className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden mb-6">
+          <div className="px-5 py-4 border-b border-outline-variant"><h2 className="text-lg font-bold text-on-surface">User Management</h2><p className="text-sm text-on-surface-variant mt-1">Search, filter, edit, deactivate and remove users with the same action-focused pattern as the Stitch design.</p></div>
+          <PeopleAccess people={peopleWithLogin} managers={managers} />
+        </section>
+
+        <RegistrationApproval />
+
+        <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 mt-6">
+          <h2 className="text-lg font-bold text-on-surface">Administration</h2>
+          <p className="text-sm text-on-surface-variant mt-1 mb-5">Use the dedicated areas below for access management, branding, approvals and reporting.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <AdminLink href="/admin/roles" title="Roles & Access" description="Manage roles and departments." primary />
+            <AdminLink href="/admin/branding" title="Branding" description="Upload the TC Professional Services logo." />
+            <AdminLink href="/employees" title="People" description="Search and manage employees and managers." />
+            <AdminLink href="/approvals" title={`PER Approvals (${pendingPER ?? 0})`} description="Review submitted PER objectives." />
+            <AdminLink href="/reports" title="Reports" description="View PER and exam reporting." />
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 }
+
 function AdminStatCard({ label, value }: { label: string; value: number }) { return <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant mb-1">{label}</p><p className="text-3xl font-extrabold text-primary">{value}</p></div>; }
+function ProgressCard({ label, value }: { label: string; value: number }) { return <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5"><div className="flex items-center justify-between"><p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">{label}</p><span className="text-2xl font-extrabold text-primary">{value}%</span></div><div className="mt-4 h-3 rounded-full bg-surface-container overflow-hidden"><div className="h-full rounded-full bg-primary" style={{ width: `${value}%` }} /></div></div>; }
 function AdminLink({ href, title, description, primary = false }: { href: string; title: string; description: string; primary?: boolean }) { return <Link href={href} className={`rounded-lg border p-4 transition hover:-translate-y-0.5 ${primary ? "border-primary bg-primary text-on-primary" : "border-outline-variant bg-surface-container-lowest"}`}><p className="text-sm font-semibold">{title}</p><p className={`text-xs mt-1 ${primary ? "opacity-90" : "text-on-surface-variant"}`}>{description}</p></Link>; }

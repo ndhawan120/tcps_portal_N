@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import NotificationBell from "./NotificationBell";
 
 type Branding = { company_name: string; logo_url: string | null };
 
@@ -94,6 +95,7 @@ export default function Nav({ role, name }: { role: string; name: string }) {
           {branding.logo_url ? <img src={branding.logo_url} alt={branding.company_name} className="h-8 w-auto max-w-[150px] object-contain" /> : <span>TCPS</span>}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
+          <NotificationBell />
           <Link href="/profile" className="hidden sm:block max-w-[130px] truncate text-xs text-white/75">{name}</Link>
           <button type="button" aria-label={mobileOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileOpen} onClick={() => setMobileOpen((value) => !value)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 text-white hover:bg-white/10">
             <span className="text-lg leading-none">{mobileOpen ? "×" : "☰"}</span>
@@ -112,7 +114,7 @@ export default function Nav({ role, name }: { role: string; name: string }) {
 
       <header className="hidden lg:flex fixed top-0 left-64 right-0 z-40 h-[68px] bg-[#fafafa] border-b border-[#e7bdb2] items-center justify-between px-10">
         <div className="w-full max-w-xl rounded-xl bg-[#f0f0f0] px-4 py-2.5 flex items-center gap-3 text-[#6b6b6b] text-sm"><svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true"><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" strokeWidth="2"/><path d="m16 16 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg><span>Search employees, roles, or status...</span></div>
-        <div className="flex items-center gap-6 ml-6"><button className="text-[#5d4038] text-xl" aria-label="Notifications">♧</button><Link href="/profile" className="border-l border-[#e7bdb2] pl-6 text-sm font-semibold text-primary">Update Profile</Link></div>
+        <div className="flex items-center gap-6 ml-6"><NotificationBell /><Link href="/profile" className="border-l border-[#e7bdb2] pl-6 text-sm font-semibold text-primary">Update Profile</Link></div>
       </header>
     </>
   );

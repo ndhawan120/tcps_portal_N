@@ -1,108 +1,226 @@
 # TCPS Professional Development Portal
 
-A real, working version of the Stitch mockups: employee/manager/admin
-dashboards, ACCA exam tracking, PER objective submission, and a manager
-approval workflow — backed by a real database and login.
+A role-based internal professional development portal for TC Professional Services. The application supports employee ACCA/PER tracking, manager review workflows, organisation-level administration, reporting, announcements, and profile management.
 
-Stack (all free tiers):
-- **Next.js 14** (App Router) — the application
-- **Supabase** — Postgres database + authentication + row-level security
-- **Vercel** — hosting, deploys straight from GitHub
+The repository is a working Next.js application backed by Supabase and deployed through Vercel.
 
----
+## Stack
 
-## 1. Create your Supabase project (free, no card needed)
+- **Next.js 14 / App Router** — application and server-rendered pages
+- **React 18 + TypeScript** — UI and type safety
+- **Tailwind CSS** — responsive styling
+- **Supabase** — PostgreSQL, Authentication, Row Level Security and server-side data access
+- **Vercel** — production hosting and GitHub-based deployments
 
-1. Go to https://supabase.com → **Start your project** → sign in with GitHub or email.
-2. **New project** → name it `tcps-portal`, set a database password (save it somewhere safe), pick the region closest to you (e.g. London/EU West).
-3. Wait ~2 minutes for it to provision.
-4. In the left sidebar go to **SQL Editor** → **New query**.
-5. Open `supabase/schema.sql` from this project, paste the whole file in, and click **Run**. This creates all the tables, security rules, and the auto-profile trigger.
-6. Go to **Project Settings → API**. Copy:
-   - **Project URL**
-   - **anon public** key
+## Current portal structure
 
-   You'll need both in step 3.
+### Employee
 
-7. Go to **Authentication → Providers** and make sure **Email** is enabled (it is by default). For an internal tool, under **Authentication → Settings**, you can turn off "Confirm email" if you'd rather add users manually without them needing to click a confirmation link.
+- Dashboard
+- Exams
+- PER Objectives
+- Documents
+- Updates
+- Profile
 
-## 2. Create your first user (yourself, as admin)
+Employees can maintain their own exam and PER progress, submit objectives for approval, maintain evidence notes, view updates and manage their profile.
 
-1. In Supabase, go to **Authentication → Users → Add user → Create new user**. Enter your TC Group email and a temporary password.
-2. Go to **Table Editor → profiles** — you should see a row was auto-created for you (first/last name will say "New User" — edit them in that table directly, or edit later in the app).
-3. In the same row, set **role** to `admin`. This makes you the first admin so you can manage everyone else from inside the app afterwards.
+### Manager
 
-## 3. Run it locally first (recommended, 5 minutes)
+- Dashboard
+- Exams
+- PER Objectives
+- Team
+- Approvals
+- Reports
+- Updates
+- Profile
+
+Managers see team-scoped progress, review submitted PER objectives and access reports for employees assigned to them.
+
+### Admin
+
+- Dashboard
+- Exams
+- PER Objectives
+- People
+- Approvals
+- Reports
+- Admin
+- Roles & Access
+- Updates
+- Profile
+
+Administrators have organisation-level visibility and can manage people, roles, account status and portal configuration.
+
+## Important data rules
+
+- The portal currently treats **22 PER objectives** as the source-of-truth total.
+- The portal currently treats **13 ACCA exam papers** as the tracked exam total.
+- Do not introduce a different hard-coded objective total in individual pages or components.
+- Manager reporting is scoped through `profiles.manager_id`.
+- Admin reporting is organisation-wide.
+- Approval actions must remain protected by authenticated role checks and database security rules.
+
+## Main routes
+
+| Area | Route | Intended access |
+|---|---|---|
+| Login | `/login` | Public |
+| Signup | `/signup` | Public |
+| Password recovery | `/forgot-password` | Public |
+| Dashboard | `/dashboard` | Authenticated |
+| Exams | `/exams` | Authenticated |
+| PER Objectives | `/per-objectives` | Authenticated |
+| Documents | `/documents` | Employee / authenticated users where enabled |
+| Updates | `/announcements` | Authenticated |
+| Profile | `/profile` | Authenticated |
+| Team | `/manager` | Manager / Admin |
+| Approvals | `/approvals` | Manager / Admin |
+| Reports | `/reports` | Manager / Admin |
+| People | `/employees` | Admin |
+| Admin | `/admin` | Admin |
+| Roles & Access | `/admin/roles` | Admin |
+| Branding | `/admin/branding` | Admin |
+
+Route access is enforced in `middleware.ts` and sensitive API endpoints perform their own server-side role checks. UI navigation is not treated as a security boundary.
+
+## Local development
+
+### 1. Install dependencies
 
 ```bash
 npm install
+```
+
+### 2. Configure environment variables
+
+Copy the example file:
+
+```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local` and paste in your Supabase URL and anon key from step 1.6.
+Set the following values:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` must only exist in trusted server/Vercel environment variables. Never expose it to client-side code and never commit it to Git.
+
+### 3. Run the application
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000 and log in with the account you created in step 2. Confirm the admin panel loads and you can see your own user.
+Open `http://localhost:3000`.
 
-## 4. Push to GitHub (free)
-
-```bash
-git init
-git add .
-git commit -m "Initial TCPS portal"
-```
-
-Create a new empty repo at https://github.com/new (private is fine), then:
+### 4. Validate before pushing
 
 ```bash
-git remote add origin https://github.com/YOUR-USERNAME/tcps-portal.git
-git branch -M main
-git push -u origin main
+npm run lint
+npm run typecheck
+npm run build
 ```
 
-## 5. Deploy on Vercel (free)
+A production deployment should not be considered ready until the TypeScript check and production build both pass.
 
-1. Go to https://vercel.com → sign up/sign in with GitHub.
-2. **Add New → Project** → import the `tcps-portal` repo you just pushed.
-3. Before deploying, expand **Environment Variables** and add:
-   - `NEXT_PUBLIC_SUPABASE_URL` → your Supabase project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → your Supabase anon key
-4. Click **Deploy**. In about a minute you'll get a live URL like `tcps-portal.vercel.app`.
-5. Every time you push new commits to `main`, Vercel redeploys automatically.
+## Supabase setup
 
-## 6. Add the rest of the team
+The database schema is maintained under `supabase/`.
 
-For each person:
-1. Supabase → **Authentication → Users → Add user**, using their TC Group email.
-2. In the live app, log in as admin → **Admin** tab → set their **role** (employee/manager/admin).
-3. To link an employee to a manager for team reporting, in Supabase **Table Editor → profiles**, set that employee's `manager_id` to the manager's `id`.
-4. To add someone's PER objectives and exams to track, insert rows into `per_objectives` and `exams` via the Table Editor (see `supabase/seed_example.sql` for the exact format), or extend the admin panel later to do this from the UI.
+For a fresh development environment:
 
-Send people their login email + a temporary password, and have them log in at your Vercel URL.
+1. Create a Supabase project.
+2. Run the SQL in `supabase/schema.sql`.
+3. Configure Authentication for internal users.
+4. Create the first admin account.
+5. Set the corresponding profile role to `admin`.
+6. Configure the same environment variables in Vercel.
 
-## 7. Optional: custom domain
+The production database should not be reset or replaced with the development schema. Schema changes should be additive and reviewed before production rollout.
 
-Vercel's free tier includes the `.vercel.app` subdomain at no cost. If TC Group
-wants this on your own domain (e.g. `progress.tc-group.com`), that requires
-DNS access to the tc-group.com domain — check with whoever manages TC Group's
-DNS/IT, then add the domain under Vercel → Project → Settings → Domains
-(still free — you just point a DNS record at Vercel).
+## Authentication and access control
 
----
+The application uses Supabase Auth with server-side session handling.
 
-## What's built vs what's a starting point
+The middleware performs these high-level checks:
 
-**Working now:** login/logout, role-based access (employee/manager/admin see
-different pages), employee dashboard with live progress stats, PER objective
-submission, manager approve/reject workflow with an audit trail, exam
-tracker, admin user list with role management.
+1. Unauthenticated users are redirected to `/login`.
+2. Pending, rejected and inactive profiles are prevented from entering the portal.
+3. `/admin/*` requires the `admin` role.
+4. Manager-only areas require `manager` or `admin`.
+5. Sensitive API routes perform an additional server-side authorization check.
 
-**Reasonable next steps:** file/evidence upload for PER objectives (Supabase
-Storage is free tier too and drops in easily), email notifications on
-approval/rejection (Supabase has a free-tier integration for this), letting
-admins add PER objectives/exams from the UI instead of the Supabase table
-editor, and the Google Business Profile / reporting-style views from the
-other mockups (documents, reports pages) if you want those built out too.
+This layered approach is intentional: hiding a navigation item is not sufficient to protect data.
+
+## Deployment
+
+The production application is hosted on Vercel and connected to this GitHub repository.
+
+Recommended deployment flow:
+
+1. Make changes on a feature branch.
+2. Run lint, typecheck and production build locally.
+3. Push the branch and review the Vercel preview deployment.
+4. Verify the affected role flows in the preview.
+5. Merge to `main` only after the preview is healthy.
+6. Confirm the production deployment after merge.
+
+Production URL:
+
+`https://tcps-portal-n.vercel.app`
+
+## Known limitations and next improvements
+
+The portal is functional, but the following areas should be treated as planned improvements rather than assumed to be complete:
+
+- **Document storage:** the current PER workflow has evidence notes; a full Supabase Storage-backed document/evidence system is still a separate enhancement.
+- **Automated notifications:** portal notifications exist in the UI, but a complete email notification pipeline for every approval/status event should be verified before relying on it operationally.
+- **Admin data entry:** some exam/PER configuration can still depend on database-backed setup rather than a complete admin configuration workflow.
+- **Automated route testing:** a full authenticated smoke-test suite for employee, manager and admin routes should be added.
+- **Dependency maintenance:** Next.js and other packages should be upgraded through a deliberate compatibility/security review rather than ad-hoc version changes.
+- **Navigation consistency:** keep role navigation, route names and internal links synchronized whenever a section is renamed or moved.
+
+See [`docs/PORTAL_AUDIT.md`](docs/PORTAL_AUDIT.md) for the current structural audit and recommended follow-up work.
+
+## Repository hygiene
+
+- Do not commit `.env.local` or any Supabase service-role credentials.
+- Keep production secrets in Vercel/Supabase environment configuration.
+- Prefer feature branches and pull requests for application changes.
+- Keep documentation and route names synchronized with the actual application.
+- Avoid maintaining duplicate components when a canonical implementation already exists under `components/` or `app/`.
+
+## Troubleshooting
+
+### Vercel says a module cannot be resolved
+
+Check the import path and confirm the file exists with the same capitalization. Linux-based Vercel builds are case-sensitive even when a local Windows development environment is not.
+
+### Material Symbols appear as text
+
+The navigation uses the `Material Symbols Outlined` font. Confirm that `app/globals.css` contains the font import and `.material-symbols-outlined` definition before changing individual navigation links.
+
+### A role can see an unexpected page
+
+Check both:
+
+- the navigation definition in `components/Nav.tsx`
+- the server-side access logic in `middleware.ts` and the affected page/API route
+
+Navigation visibility alone must never be used as authorization.
+
+## Project documentation
+
+- [`docs/PORTAL_AUDIT.md`](docs/PORTAL_AUDIT.md) — current structural audit, risks and follow-up plan
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — development and change workflow
+- [`SECURITY.md`](SECURITY.md) — security expectations and vulnerability reporting
+
+## Maintainer
+
+TC Professional Services internal development team.

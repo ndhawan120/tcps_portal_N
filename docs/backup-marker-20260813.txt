@@ -1,0 +1,1 @@
+Backup marker for branding/UI work. Existing production state is preserved by Git history; branding changes are implemented separately from application behavior.

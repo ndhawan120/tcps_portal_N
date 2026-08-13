@@ -5,10 +5,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --tc-orange: #f15a24;
-  --tc-charcoal: #171717;
-  --tc-warm-white: #f7f5f2;
-  --tc-border: #d5d0ca;
+  --tc-orange: #ad2c00;
+  --tc-charcoal: #191919;
+  --tc-warm-white: #f9f9f9;
+  --tc-border: #e7bdb2;
 }
 
 html {
@@ -21,9 +21,16 @@ body {
   color: var(--tc-charcoal);
 }
 
+@media (min-width: 1024px) {
+  body {
+    padding-left: 16rem;
+    padding-top: 68px;
+  }
+}
+
 ::selection {
-  background: #ffd2c1;
-  color: #171717;
+  background: #ffdbd1;
+  color: #3b0900;
 }
 
 button,
@@ -34,7 +41,6 @@ textarea {
   accent-color: var(--tc-orange);
 }
 
-/* Shared branded scrollbar for long dashboards, tables and update lists. */
 * {
   scrollbar-width: thin;
   scrollbar-color: #c9c3bd transparent;

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -8,12 +8,21 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
   const inactiveNotice = searchParams.get("error") === "account_inactive";
   const pendingNotice = searchParams.get("error") === "account_pending";
   const rejectedNotice = searchParams.get("error") === "account_rejected";
+
+  useEffect(() => {
+    const loadBranding = async () => {
+      const { data } = await supabase.from("portal_settings").select("logo_url").eq("id", 1).maybeSingle();
+      if (data?.logo_url) setLogoUrl(data.logo_url);
+    };
+    loadBranding();
+  }, [supabase]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError(null);
@@ -28,7 +37,10 @@ export default function LoginForm() {
   };
 
   return <div className="min-h-screen flex items-center justify-center bg-background px-4"><div className="w-full max-w-sm bg-surface-container-lowest rounded-xl shadow-sm p-8 border border-outline-variant">
-    <div className="mb-7"><p className="text-2xl font-extrabold text-on-surface">TC Professional Services</p><p className="text-sm text-on-surface-variant mt-1">Professional Development Portal</p></div>
+    <div className="mb-7 text-center">
+      {logoUrl && <img src={logoUrl} alt="TC Professional Services" className="mx-auto mb-5 h-16 w-auto max-w-[260px] object-contain" />}
+      <p className="text-2xl font-extrabold text-on-surface">TC Professional Services</p><p className="text-sm text-on-surface-variant mt-1">Professional Development Portal</p>
+    </div>
     {inactiveNotice && <p className="text-sm text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2 mb-4">This account is inactive. Please contact your administrator.</p>}
     {pendingNotice && <p className="text-sm text-on-surface bg-surface-container border border-outline-variant rounded-md px-3 py-2 mb-4">Your account has been created successfully and is waiting for administrator approval.</p>}
     {rejectedNotice && <p className="text-sm text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2 mb-4">Your account registration was not approved. Please contact your administrator.</p>}

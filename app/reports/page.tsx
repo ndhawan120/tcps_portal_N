@@ -1,78 +1,27 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
-import RealtimeRefresh from "@/components/RealtimeRefresh";
 
-const PER_STATUSES = ["not_started", "draft", "pending_approval", "approved", "rejected"];
-const EXAM_STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"];
-const EXAM_RESULTS = ["No Result", "Pass", "Fail", "Exempt"];
+const PER = ["not_started", "draft", "pending_approval", "approved", "rejected"];
+const EXAMS = ["not_started", "in_progress", "scheduled", "passed", "failed"];
 
 export default async function ReportsPage() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (profile?.role !== "admin") redirect("/dashboard");
-
-  const { data: employees } = await supabase.from("profiles").select("id").eq("role", "employee");
-  const ids = (employees ?? []).map((employee) => employee.id);
-
+  if (!profile || !["admin", "manager"].includes(profile.role)) redirect("/dashboard");
+  const people = profile.role === "admin" ? await supabase.from("profiles").select("id").eq("role", "employee").eq("status", "active") : await supabase.from("profiles").select("id").eq("role", "employee").eq("manager_id", user.id).eq("status", "active");
+  const ids = (people.data ?? []).map((p) => p.id);
   const [{ data: objectives }, { data: exams }] = await Promise.all([
     ids.length ? supabase.from("per_objectives").select("status").in("user_id", ids) : Promise.resolve({ data: [] as { status: string }[] }),
-    ids.length ? supabase.from("exams").select("status,result").in("user_id", ids) : Promise.resolve({ data: [] as { status: string; result: string | null }[] }),
+    ids.length ? supabase.from("exams").select("status").in("user_id", ids) : Promise.resolve({ data: [] as { status: string }[] }),
   ]);
-
-  const perCounts: Record<string, number> = Object.fromEntries(PER_STATUSES.map((status) => [status, 0]));
-  const examCounts: Record<string, number> = Object.fromEntries(EXAM_STATUSES.map((status) => [status, 0]));
-  const resultCounts: Record<string, number> = Object.fromEntries(EXAM_RESULTS.map((result) => [result, 0]));
-
-  for (const row of objectives ?? []) perCounts[row.status] = (perCounts[row.status] ?? 0) + 1;
-  for (const row of exams ?? []) {
-    examCounts[row.status] = (examCounts[row.status] ?? 0) + 1;
-    const result = row.result ?? "No Result";
-    resultCounts[result] = (resultCounts[result] ?? 0) + 1;
-  }
-
-  return (
-    <div>
-      <RealtimeRefresh />
-      <Nav role="admin" name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} />
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-on-surface">Reports</h1>
-        <p className="text-sm text-on-surface-variant mt-1 mb-8">Company-wide employee progress and status reporting.</p>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <StatusChart title="PER Objective Status" counts={perCounts} statuses={PER_STATUSES} />
-          <StatusChart title="Exam Status" counts={examCounts} statuses={EXAM_STATUSES} />
-          <StatusChart title="Exam Result" counts={resultCounts} statuses={EXAM_RESULTS} />
-        </div>
-      </main>
-    </div>
-  );
+  const per: Record<string, number> = Object.fromEntries(PER.map((s) => [s, 0]));
+  const exam: Record<string, number> = Object.fromEntries(EXAMS.map((s) => [s, 0]));
+  for (const row of objectives ?? []) if (row.status in per) per[row.status]++;
+  for (const row of exams ?? []) if (row.status in exam) exam[row.status]++;
+  return <div className="min-h-screen bg-[#f9f9f9]"><Nav role={profile.role} name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} /><main className="lg:ml-64 pt-[92px] px-6 pb-10"><div className="max-w-7xl mx-auto space-y-7"><div><h1 className="text-3xl font-extrabold">{profile.role === "admin" ? "Organisation Reports" : "Team Reports"}</h1><p className="text-sm text-on-surface-variant mt-1">{profile.role === "admin" ? "Company-wide progress." : "Only your assigned employees are included."}</p></div><div className="grid grid-cols-2 lg:grid-cols-4 gap-4"><Metric title="Employees" value={ids.length}/><Metric title="Pending PER" value={per.pending_approval}/><Metric title="Approved PER" value={per.approved}/><Metric title="Exams Passed" value={exam.passed}/></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><Chart title="PER Objective Status" data={per}/><Chart title="Exam Status" data={exam}/></div></div></main></div>;
 }
-
-function StatusChart({ title, counts, statuses }: { title: string; counts: Record<string, number>; statuses: string[] }) {
-  const max = Math.max(1, ...statuses.map((status) => counts[status] ?? 0));
-  return (
-    <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
-      <h2 className="text-lg font-bold text-on-surface mb-5">{title}</h2>
-      <div className="space-y-4">
-        {statuses.map((status) => {
-          const count = counts[status] ?? 0;
-          return (
-            <div key={status}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="capitalize">{status.replaceAll("_", " ")}</span>
-                <span className="font-semibold">{count}</span>
-              </div>
-              <div className="h-3 rounded-full bg-surface-container overflow-hidden">
-                <div className="h-full bg-primary" style={{ width: `${(count / max) * 100}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
+function Metric({ title, value }: { title: string; value: number }) { return <div className="bg-white border border-outline-variant rounded-xl p-5"><p className="text-xs font-bold uppercase text-on-surface-variant">{title}</p><p className="text-2xl font-extrabold mt-2">{value}</p></div>; }
+function Chart({ title, data }: { title: string; data: Record<string, number> }) { const max = Math.max(1, ...Object.values(data)); return <section className="bg-white border border-outline-variant rounded-xl p-5"><h2 className="text-lg font-bold mb-5">{title}</h2>{Object.entries(data).map(([key,value]) => <div key={key} className="mb-4"><div className="flex justify-between text-xs mb-1"><span className="capitalize">{key.replaceAll("_", " ")}</span><b>{value}</b></div><div className="h-3 rounded-full bg-surface-container overflow-hidden"><div className="h-full bg-primary" style={{width:`${(value/max)*100}%`}} /></div></div>)}</section>; }

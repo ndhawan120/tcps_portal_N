@@ -96,6 +96,12 @@ $$;
 drop trigger if exists exams_notification on public.exams;
 create trigger exams_notification after insert or update of status, result on public.exams for each row execute function public.notify_exam_change();
 
+revoke execute on function public.create_notification(uuid,text,text,text,text) from public, anon, authenticated;
+revoke execute on function public.notify_admins_for_signup() from public, anon, authenticated;
+revoke execute on function public.notify_announcement() from public, anon, authenticated;
+revoke execute on function public.notify_per_objective() from public, anon, authenticated;
+revoke execute on function public.notify_exam_change() from public, anon, authenticated;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN

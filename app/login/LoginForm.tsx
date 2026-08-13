@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const DEFAULT_LOGO_URL = "https://xgmyasdoulblikhxaehg.supabase.co/storage/v1/object/public/portal-branding/tcps-logo.png";
+
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -41,7 +43,7 @@ export default function LoginForm() {
       <div className="w-full max-w-5xl min-h-[620px] grid lg:grid-cols-2 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-xl">
         <section className="hidden lg:flex flex-col justify-between bg-on-surface p-12 text-white">
           <div>
-            {logoUrl ? <img src={logoUrl} alt="TC Professional Services" className="h-16 w-auto max-w-[280px] object-contain object-left" /> : <div className="text-2xl font-extrabold">TC Professional Services</div>}
+            <img src={logoUrl} alt="TC Professional Services" className="h-16 w-auto max-w-[280px] object-contain object-left" />
           </div>
           <div className="max-w-md">
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Professional Development Portal</p>
@@ -55,7 +57,7 @@ export default function LoginForm() {
           <div className="w-full max-w-md">
             <div className="mb-8 text-center lg:text-left">
               <div className="lg:hidden mb-6 flex justify-center">
-                {logoUrl ? <img src={logoUrl} alt="TC Professional Services" className="h-14 w-auto max-w-[250px] object-contain" /> : <span className="text-xl font-extrabold text-on-surface">TC Professional Services</span>}
+                <img src={logoUrl} alt="TC Professional Services" className="h-14 w-auto max-w-[250px] object-contain" />
               </div>
               <h2 className="text-2xl font-extrabold text-on-surface">Welcome back</h2>
               <p className="mt-1 text-sm text-on-surface-variant">Sign in to your professional development portal.</p>

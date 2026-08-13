@@ -7,504 +7,78 @@ import StatusPill from "@/components/StatusPill";
 import { ACCA_EXAMS } from "@/lib/accaExams";
 
 const STATUSES = [
-  {
-    value: "not_started",
-    label: "Not Started",
-  },
-  {
-    value: "in_progress",
-    label: "In Progress",
-  },
-  {
-    value: "scheduled",
-    label: "Scheduled",
-  },
-  {
-    value: "passed",
-    label: "Passed",
-  },
-  {
-    value: "failed",
-    label: "Failed",
-  },
+  ["not_started", "Not Started"],
+  ["in_progress", "In Progress"],
+  ["scheduled", "Scheduled"],
+  ["passed", "Passed"],
+  ["failed", "Failed"],
 ] as const;
+const RESULTS = [["", "No Result"], ["Pass", "Pass"], ["Fail", "Fail"], ["Exempt", "Exempt"]] as const;
 
-const RESULTS = [
-  {
-    value: "",
-    label: "No Result",
-  },
-  {
-    value: "Pass",
-    label: "Pass",
-  },
-  {
-    value: "Fail",
-    label: "Fail",
-  },
-  {
-    value: "Exempt",
-    label: "Exempt",
-  },
-] as const;
+type ExistingRow = { id?: string; level?: string; status: string; exam_date?: string | null; next_sitting: string | null; result: string | null };
 
-type ExistingRow = {
-  id?: string;
-  level?: string;
-  status: string;
-  exam_date?: string | null;
-  next_sitting: string | null;
-  result: string | null;
-};
-
-export default function ExamsList({
-  userId,
-  existingByModule,
-  readOnly = false,
-}: {
-  userId: string;
-  existingByModule: Record<string, ExistingRow>;
-  readOnly?: boolean;
-}) {
-  const grouped = ACCA_EXAMS.reduce<Record<string, typeof ACCA_EXAMS>>(
-    (acc, exam) => {
-      if (!acc[exam.level]) {
-        acc[exam.level] = [];
-      }
-
-      acc[exam.level].push(exam);
-
-      return acc;
-    },
-    {}
-  );
-
-  return (
-    <div className="space-y-8">
-      {Object.entries(grouped).map(([level, exams]) => (
-        <div key={level}>
-          <h2 className="text-sm font-bold text-on-surface-variant uppercase tracking-wide mb-3">
-            {level}
-          </h2>
-
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden">
-            {exams.map((exam) => (
-              <ExamRow
-                key={exam.code}
-                userId={userId}
-                code={exam.code}
-                name={exam.name}
-                optional={exam.optional}
-                existing={existingByModule[exam.name]}
-                readOnly={readOnly}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+export default function ExamsList({ userId, existingByModule, readOnly = false }: { userId: string; existingByModule: Record<string, ExistingRow>; readOnly?: boolean }) {
+  const [selected, setSelected] = useState<null | { code: string; name: string; level: string; optional: boolean; existing?: ExistingRow }>(null);
+  return <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest">
+    <div className="hidden lg:grid grid-cols-[1.6fr_1fr_150px_130px_110px_120px] gap-3 bg-surface-container-low px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant border-b border-outline-variant"><span>Exam Module</span><span>Level</span><span>Status</span><span>Date</span><span>Result</span><span className="text-right">Actions</span></div>
+    <div className="divide-y divide-outline-variant">{ACCA_EXAMS.map((exam) => <ExamRow key={exam.code} userId={userId} exam={exam} existing={existingByModule[exam.name]} readOnly={readOnly} onDetails={() => setSelected({ ...exam, existing: existingByModule[exam.name] })} />)}</div>
+    {selected && <ExamDetails exam={selected} onClose={() => setSelected(null)} />}
+  </div>;
 }
 
-function getExamLevel(name: string): string {
-  const found = ACCA_EXAMS.find(
-    (exam) => exam.name === name
-  );
-
-  return found?.level ?? "Applied Knowledge";
-}
-
-function ExamRow({
-  userId,
-  code,
-  name,
-  optional,
-  existing,
-  readOnly,
-}: {
-  userId: string;
-  code: string;
-  name: string;
-  optional: boolean;
-  existing?: ExistingRow;
-  readOnly: boolean;
-}) {
-  const [status, setStatus] = useState(
-    existing?.status ?? "not_started"
-  );
-
-  const [nextSitting, setNextSitting] = useState(
-    existing?.next_sitting ?? ""
-  );
-
-  const [result, setResult] = useState(
-    existing?.result ?? ""
-  );
-
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
+function ExamRow({ userId, exam, existing, readOnly, onDetails }: { userId: string; exam: (typeof ACCA_EXAMS)[number]; existing?: ExistingRow; readOnly: boolean; onDetails: () => void }) {
   const router = useRouter();
   const supabase = createClient();
+  const [status, setStatus] = useState(existing?.status ?? "not_started");
+  const [examDate, setExamDate] = useState(existing?.exam_date ?? "");
+  const [nextSitting, setNextSitting] = useState(existing?.next_sitting ?? "");
+  const [result, setResult] = useState(existing?.result ?? "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  /*
-   * =========================================================
-   * SAVE EXAM
-   * =========================================================
-   */
-
-  const saveExam = async (patch: {
-    status?: string;
-    next_sitting?: string | null;
-    result?: string | null;
-  }) => {
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-
-    const level = getExamLevel(name);
-
-    const payload = {
-      user_id: userId,
-      exam_module: name,
-      level,
-      status: patch.status ?? status,
-      next_sitting:
-        patch.next_sitting !== undefined
-          ? patch.next_sitting
-          : nextSitting || null,
-      result:
-        patch.result !== undefined
-          ? patch.result
-          : result || null,
-    };
-
+  const saveExam = async (patch: Partial<{ status: string; exam_date: string | null; next_sitting: string | null; result: string | null }>) => {
+    if (readOnly || saving) return;
+    setSaving(true); setMessage(null); setError(null);
+    const payload = { user_id: userId, exam_module: exam.name, level: exam.level, status: patch.status ?? status, exam_date: patch.exam_date !== undefined ? patch.exam_date : examDate || null, next_sitting: patch.next_sitting !== undefined ? patch.next_sitting : nextSitting || null, result: patch.result !== undefined ? patch.result : result || null };
     try {
-      /*
-       * -------------------------------------------------------
-       * If an existing row already exists, UPDATE it.
-       *
-       * This avoids relying on ON CONFLICT and therefore avoids
-       * the unique-constraint error you were getting.
-       * -------------------------------------------------------
-       */
-
-      if (existing?.id) {
-        const { error: updateError } = await supabase
-          .from("exams")
-          .update(payload)
-          .eq("id", existing.id)
-          .eq("user_id", userId);
-
-        if (updateError) {
-          throw new Error(updateError.message);
-        }
-      } else {
-        /*
-         * -----------------------------------------------------
-         * No existing record yet.
-         *
-         * First check whether one already exists for this
-         * employee + exam module.
-         * -----------------------------------------------------
-         */
-
-        const { data: existingExam, error: lookupError } =
-          await supabase
-            .from("exams")
-            .select("id")
-            .eq("user_id", userId)
-            .eq("exam_module", name)
-            .maybeSingle();
-
-        if (lookupError) {
-          throw new Error(lookupError.message);
-        }
-
-        if (existingExam?.id) {
-          const { error: updateError } = await supabase
-            .from("exams")
-            .update(payload)
-            .eq("id", existingExam.id)
-            .eq("user_id", userId);
-
-          if (updateError) {
-            throw new Error(updateError.message);
-          }
-        } else {
-          const { error: insertError } = await supabase
-            .from("exams")
-            .insert(payload);
-
-          if (insertError) {
-            throw new Error(insertError.message);
-          }
-        }
+      let id = existing?.id;
+      if (!id) {
+        const { data, error: lookupError } = await supabase.from("exams").select("id").eq("user_id", userId).eq("exam_module", exam.name).maybeSingle();
+        if (lookupError) throw lookupError;
+        id = data?.id;
       }
-
-      setSuccess("Saved successfully.");
-
-      /*
-       * Refresh server data so the page and dashboard stay
-       * synchronized.
-       */
-
+      const response = id ? await supabase.from("exams").update(payload).eq("id", id).eq("user_id", userId) : await supabase.from("exams").insert(payload);
+      if (response.error) throw response.error;
+      setMessage("Saved successfully.");
       router.refresh();
-    } catch (saveError) {
-      console.error("Exam update failed:", saveError);
-
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Unable to save exam information."
-      );
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) {
+      console.error("Exam update failed", err);
+      setError(err instanceof Error ? err.message : "Unable to save exam information.");
+    } finally { setSaving(false); }
   };
 
-  /*
-   * =========================================================
-   * STATUS CHANGE
-   * =========================================================
-   */
+  const statusChange = (value: string) => { setStatus(value); void saveExam({ status: value }); };
+  const resultChange = (value: string) => { setResult(value); const inferredStatus = value === "Pass" ? "passed" : value === "Fail" ? "failed" : undefined; if (inferredStatus) setStatus(inferredStatus); void saveExam({ result: value || null, ...(inferredStatus ? { status: inferredStatus } : {}) }); };
+  const dateBlur = () => void saveExam({ exam_date: examDate || null });
+  const nextBlur = () => void saveExam({ next_sitting: nextSitting || null });
 
-  const handleStatusChange = (
-    newStatus: string
-  ) => {
-    setStatus(newStatus);
-
-    saveExam({
-      status: newStatus,
-    });
-  };
-
-  /*
-   * =========================================================
-   * RESULT CHANGE
-   * =========================================================
-   */
-
-  const handleResultChange = (
-    newResult: string
-  ) => {
-    setResult(newResult);
-
-    saveExam({
-      result: newResult || null,
-    });
-  };
-
-  /*
-   * =========================================================
-   * NEXT SITTING CHANGE
-   * =========================================================
-   */
-
-  const handleNextSittingChange = (
-    newDate: string
-  ) => {
-    setNextSitting(newDate);
-  };
-
-  /*
-   * Save date after user leaves the field.
-   */
-
-  const handleNextSittingBlur = () => {
-    saveExam({
-      next_sitting: nextSitting || null,
-    });
-  };
-
-  const applied = status !== "not_started";
-
-  return (
-    <div className="p-5">
-      <div className="flex flex-col xl:flex-row xl:items-center gap-4">
-
-        {/* =====================================================
-            EXAM NAME
-        ===================================================== */}
-
-        <div className="flex-1 min-w-[240px]">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-on-surface">
-              {code} — {name}
-            </p>
-
-            {optional && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">
-                Optional
-              </span>
-            )}
-          </div>
-
-          <p className="text-xs text-on-surface-variant mt-1">
-            {applied
-              ? "Exam information entered"
-              : "Not started"}
-          </p>
-        </div>
-
-        {/* =====================================================
-            CONTROLS
-        ===================================================== */}
-
-        {readOnly ? (
-          <div className="flex flex-wrap items-center gap-4">
-            <div>
-              <p className="text-[10px] uppercase font-semibold text-on-surface-variant">
-                Next Sitting
-              </p>
-
-              <p className="text-xs text-on-surface">
-                {nextSitting
-                  ? new Date(
-                      nextSitting
-                    ).toLocaleDateString()
-                  : "—"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-[10px] uppercase font-semibold text-on-surface-variant">
-                Result
-              </p>
-
-              <p className="text-xs text-on-surface">
-                {result || "No Result"}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-
-            {/* =================================================
-                STATUS
-            ================================================= */}
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
-                Status
-              </label>
-
-              <select
-                value={status}
-                disabled={saving}
-                onChange={(event) =>
-                  handleStatusChange(
-                    event.target.value
-                  )
-                }
-                className="min-w-[145px] text-xs border border-outline-variant rounded-md px-3 py-2 bg-surface-container-lowest text-on-surface disabled:opacity-50"
-              >
-                {STATUSES.map((item) => (
-                  <option
-                    key={item.value}
-                    value={item.value}
-                  >
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* =================================================
-                NEXT SITTING
-            ================================================= */}
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
-                Next Sitting
-              </label>
-
-              <input
-                type="date"
-                value={nextSitting}
-                disabled={saving}
-                onChange={(event) =>
-                  handleNextSittingChange(
-                    event.target.value
-                  )
-                }
-                onBlur={handleNextSittingBlur}
-                className="min-w-[145px] text-xs border border-outline-variant rounded-md px-3 py-2 bg-surface-container-lowest text-on-surface disabled:opacity-50"
-              />
-            </div>
-
-            {/* =================================================
-                RESULT
-            ================================================= */}
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
-                Result
-              </label>
-
-              <select
-                value={result}
-                disabled={saving}
-                onChange={(event) =>
-                  handleResultChange(
-                    event.target.value
-                  )
-                }
-                className="min-w-[130px] text-xs border border-outline-variant rounded-md px-3 py-2 bg-surface-container-lowest text-on-surface disabled:opacity-50"
-              >
-                {RESULTS.map((item) => (
-                  <option
-                    key={item.value || "no-result"}
-                    value={item.value}
-                  >
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* =====================================================
-            STATUS PILL
-        ===================================================== */}
-
-        <div className="shrink-0">
-          <StatusPill status={status} />
-        </div>
-      </div>
-
-      {/* =======================================================
-          SAVING
-      ======================================================= */}
-
-      {saving && (
-        <p className="mt-3 text-xs text-on-surface-variant">
-          Saving exam information...
-        </p>
-      )}
-
-      {/* =======================================================
-          SUCCESS
-      ======================================================= */}
-
-      {success && !error && (
-        <p className="mt-3 text-xs text-on-surface-variant bg-surface-container border border-outline-variant rounded-md px-3 py-2">
-          ✓ {success}
-        </p>
-      )}
-
-      {/* =======================================================
-          ERROR
-      ======================================================= */}
-
-      {error && (
-        <p className="mt-3 text-xs text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2">
-          <strong>Couldn&apos;t save:</strong>{" "}
-          {error}
-        </p>
-      )}
+  return <div className="px-4 py-4 lg:px-5 hover:bg-surface-container-low transition-colors">
+    <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr_150px_130px_110px_120px] gap-3 lg:items-center">
+      <div className="min-w-0"><div className="flex items-center gap-2"><p className="font-bold text-sm text-on-surface">{exam.name} ({exam.code})</p>{exam.optional && <span className="rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-bold text-on-surface-variant">Optional</span>}</div><p className="text-xs text-on-surface-variant mt-1">{existing?.status === "not_started" || !existing ? "Not started" : "Exam information entered"}</p></div>
+      <p className="hidden lg:block text-xs text-on-surface-variant">{exam.level}</p>
+      <div><label className="lg:hidden block text-[10px] font-bold uppercase text-on-surface-variant mb-1">Status</label>{readOnly ? <StatusPill status={status} /> : <select value={status} disabled={saving} onChange={(e) => statusChange(e.target.value)} className="w-full rounded-md border border-outline-variant bg-surface-container-lowest px-2 py-2 text-xs">{STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>}</div>
+      <div><label className="lg:hidden block text-[10px] font-bold uppercase text-on-surface-variant mb-1">Date</label>{readOnly ? <span className="text-xs">{examDate ? new Date(examDate).toLocaleDateString() : "—"}</span> : <input type="date" value={examDate} disabled={saving} onChange={(e) => setExamDate(e.target.value)} onBlur={dateBlur} className="w-full rounded-md border border-outline-variant bg-surface-container-lowest px-2 py-2 text-xs" />}</div>
+      <div><label className="lg:hidden block text-[10px] font-bold uppercase text-on-surface-variant mb-1">Result</label>{readOnly ? <span className="text-xs font-bold">{result || "—"}</span> : <select value={result} disabled={saving} onChange={(e) => resultChange(e.target.value)} className="w-full rounded-md border border-outline-variant bg-surface-container-lowest px-2 py-2 text-xs">{RESULTS.map(([value, label]) => <option key={value || "none"} value={value}>{label}</option>)}</select>}</div>
+      <div className="lg:text-right"><button type="button" onClick={onDetails} className="text-xs font-bold text-primary hover:underline">View Details</button></div>
     </div>
-  );
+    {!readOnly && <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-outline-variant pt-3"><label className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Next Sitting</label><input type="date" value={nextSitting} disabled={saving} onChange={(e) => setNextSitting(e.target.value)} onBlur={nextBlur} className="rounded-md border border-outline-variant bg-surface-container-lowest px-2 py-1.5 text-xs" />{saving && <span className="text-[11px] text-on-surface-variant">Saving...</span>}{message && <span className="text-[11px] text-on-surface-variant">✓ {message}</span>}{error && <span className="text-[11px] text-error">{error}</span>}</div>}
+  </div>;
 }
+
+function ExamDetails({ exam, onClose }: { exam: { code: string; name: string; level: string; optional: boolean; existing?: ExistingRow }; onClose: () => void }) {
+  const e = exam.existing;
+  return <div className="fixed inset-0 z-[100] bg-black/40 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Exam details"><div className="w-full max-w-lg rounded-xl bg-surface-container-lowest border border-outline-variant shadow-2xl overflow-hidden"><div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant"><div><h3 className="font-bold text-lg">{exam.name}</h3><p className="text-xs text-on-surface-variant">{exam.code} · {exam.level}{exam.optional ? " · Optional paper" : ""}</p></div><button type="button" onClick={onClose} className="h-8 w-8 rounded-md hover:bg-surface-container text-lg" aria-label="Close">×</button></div><div className="grid grid-cols-2 gap-4 p-5"><Detail label="Status" value={labelStatus(e?.status ?? "not_started")} /><Detail label="Result" value={e?.result || "No result"} /><Detail label="Exam Date" value={e?.exam_date ? new Date(e.exam_date).toLocaleDateString() : "—"} /><Detail label="Next Sitting" value={e?.next_sitting ? new Date(e.next_sitting).toLocaleDateString() : "—"} /></div><div className="px-5 pb-5"><button type="button" onClick={onClose} className="w-full rounded-lg bg-on-surface text-surface px-4 py-2.5 text-sm font-semibold">Close</button></div></div></div>;
+}
+function Detail({ label, value }: { label: string; value: string }) { return <div className="rounded-lg bg-surface-container-low p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">{label}</p><p className="text-sm font-semibold mt-1">{value}</p></div>; }
+function labelStatus(value: string) { return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase()); }

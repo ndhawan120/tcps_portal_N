@@ -23,8 +23,6 @@ The repository is a working Next.js application backed by Supabase and deployed 
 - Updates
 - Profile
 
-Employees can maintain their own exam and PER progress, submit objectives for approval, maintain evidence notes, view updates and manage their profile.
-
 ### Manager
 
 - Dashboard
@@ -35,8 +33,6 @@ Employees can maintain their own exam and PER progress, submit objectives for ap
 - Reports
 - Updates
 - Profile
-
-Managers see team-scoped progress, review submitted PER objectives and access reports for employees assigned to them.
 
 ### Admin
 
@@ -51,7 +47,7 @@ Managers see team-scoped progress, review submitted PER objectives and access re
 - Updates
 - Profile
 
-Administrators have organisation-level visibility and can manage people, roles, account status and portal configuration.
+The role navigation is defined in `components/Nav.tsx`. Route protection is handled separately by `middleware.ts` and individual sensitive API handlers.
 
 ## Important data rules
 
@@ -83,25 +79,23 @@ Administrators have organisation-level visibility and can manage people, roles, 
 | Roles & Access | `/admin/roles` | Admin |
 | Branding | `/admin/branding` | Admin |
 
-Route access is enforced in `middleware.ts` and sensitive API endpoints perform their own server-side role checks. UI navigation is not treated as a security boundary.
+Route access is enforced in `middleware.ts` and sensitive API endpoints perform their own server-side authorization checks. UI navigation is not treated as a security boundary.
 
 ## Local development
 
-### 1. Install dependencies
+### Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment variables
-
-Copy the example file:
+### Configure environment variables
 
 ```bash
 cp .env.example .env.local
 ```
 
-Set the following values:
+Set:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
@@ -109,9 +103,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` must only exist in trusted server/Vercel environment variables. Never expose it to client-side code and never commit it to Git.
+`SUPABASE_SERVICE_ROLE_KEY` is server-only. Never expose it through a `NEXT_PUBLIC_*` variable, client component or committed file.
 
-### 3. Run the application
+### Run locally
 
 ```bash
 npm run dev
@@ -119,15 +113,13 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-### 4. Validate before pushing
+### Validate a release
 
 ```bash
-npm run lint
-npm run typecheck
-npm run build
+npm run check
 ```
 
-A production deployment should not be considered ready until the TypeScript check and production build both pass.
+`npm run check` runs lint, TypeScript validation and the production build in sequence.
 
 ## Supabase setup
 
@@ -136,13 +128,13 @@ The database schema is maintained under `supabase/`.
 For a fresh development environment:
 
 1. Create a Supabase project.
-2. Run the SQL in `supabase/schema.sql`.
+2. Run `supabase/schema.sql`.
 3. Configure Authentication for internal users.
 4. Create the first admin account.
 5. Set the corresponding profile role to `admin`.
 6. Configure the same environment variables in Vercel.
 
-The production database should not be reset or replaced with the development schema. Schema changes should be additive and reviewed before production rollout.
+Do not reset or replace the production database with a development schema. Production schema changes should be reviewed and applied deliberately.
 
 ## Authentication and access control
 
@@ -162,12 +154,12 @@ This layered approach is intentional: hiding a navigation item is not sufficient
 
 The production application is hosted on Vercel and connected to this GitHub repository.
 
-Recommended deployment flow:
+Recommended flow:
 
-1. Make changes on a feature branch.
-2. Run lint, typecheck and production build locally.
-3. Push the branch and review the Vercel preview deployment.
-4. Verify the affected role flows in the preview.
+1. Work on a feature branch.
+2. Run `npm run check`.
+3. Review the Vercel preview deployment.
+4. Verify the affected employee, manager and admin flows.
 5. Merge to `main` only after the preview is healthy.
 6. Confirm the production deployment after merge.
 
@@ -175,51 +167,46 @@ Production URL:
 
 `https://tcps-portal-n.vercel.app`
 
-## Known limitations and next improvements
+## Current known flaws / follow-up work
 
-The portal is functional, but the following areas should be treated as planned improvements rather than assumed to be complete:
+The portal is functional, but these items should not be considered finished:
 
-- **Document storage:** the current PER workflow has evidence notes; a full Supabase Storage-backed document/evidence system is still a separate enhancement.
-- **Automated notifications:** portal notifications exist in the UI, but a complete email notification pipeline for every approval/status event should be verified before relying on it operationally.
-- **Admin data entry:** some exam/PER configuration can still depend on database-backed setup rather than a complete admin configuration workflow.
-- **Automated route testing:** a full authenticated smoke-test suite for employee, manager and admin routes should be added.
-- **Dependency maintenance:** Next.js and other packages should be upgraded through a deliberate compatibility/security review rather than ad-hoc version changes.
-- **Navigation consistency:** keep role navigation, route names and internal links synchronized whenever a section is renamed or moved.
-
-See [`docs/PORTAL_AUDIT.md`](docs/PORTAL_AUDIT.md) for the current structural audit and recommended follow-up work.
+- **Document storage:** the current PER workflow supports evidence notes; a full file-upload/storage workflow still needs Supabase Storage, metadata, access rules and retention behavior.
+- **Automated notifications:** the notification UI exists, but the complete email/status-event pipeline should be verified before relying on it operationally.
+- **Admin configuration:** some exam/PER setup can still depend on database-backed configuration rather than a complete admin UI workflow.
+- **Automated route testing:** authenticated smoke tests for employee, manager and admin flows are still needed.
+- **Dependency maintenance:** package upgrades should be handled as deliberate compatibility/security updates followed by `npm run check`.
+- **Navigation consistency:** route names, internal links, middleware rules and role navigation must be updated together whenever a section moves.
+- **Duplicate legacy component:** a root-level `Nav.tsx` exists alongside the canonical `components/Nav.tsx`. The dashboard imports `components/Nav.tsx`; the old root component should be removed after confirming no legacy import depends on it.
+- **Configuration centralization:** totals such as 22 PER objectives and 13 exams should eventually come from one configuration/source rather than being repeated as constants across pages.
 
 ## Repository hygiene
 
-- Do not commit `.env.local` or any Supabase service-role credentials.
+- Never commit `.env.local` or Supabase service-role credentials.
 - Keep production secrets in Vercel/Supabase environment configuration.
 - Prefer feature branches and pull requests for application changes.
-- Keep documentation and route names synchronized with the actual application.
-- Avoid maintaining duplicate components when a canonical implementation already exists under `components/` or `app/`.
+- Keep documentation and route names synchronized with the application.
+- Avoid duplicate implementations of shared components.
+- Treat server-side authorization as the security boundary.
 
 ## Troubleshooting
 
 ### Vercel says a module cannot be resolved
 
-Check the import path and confirm the file exists with the same capitalization. Linux-based Vercel builds are case-sensitive even when a local Windows development environment is not.
+Check the import path and confirm the file exists with exactly the same capitalization. Vercel builds on Linux, so filename casing must match imports exactly.
 
 ### Material Symbols appear as text
 
-The navigation uses the `Material Symbols Outlined` font. Confirm that `app/globals.css` contains the font import and `.material-symbols-outlined` definition before changing individual navigation links.
+The navigation uses the `Material Symbols Outlined` font. Confirm `app/globals.css` contains both the font import and `.material-symbols-outlined` definition before changing navigation links.
 
-### A role can see an unexpected page
+### A role sees an unexpected page
 
 Check both:
 
-- the navigation definition in `components/Nav.tsx`
-- the server-side access logic in `middleware.ts` and the affected page/API route
+- `components/Nav.tsx` for navigation visibility
+- `middleware.ts` and the affected page/API route for server-side authorization
 
 Navigation visibility alone must never be used as authorization.
-
-## Project documentation
-
-- [`docs/PORTAL_AUDIT.md`](docs/PORTAL_AUDIT.md) — current structural audit, risks and follow-up plan
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — development and change workflow
-- [`SECURITY.md`](SECURITY.md) — security expectations and vulnerability reporting
 
 ## Maintainer
 

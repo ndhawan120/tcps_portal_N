@@ -17,7 +17,7 @@ A role-based internal professional development portal for TC Professional Servic
 - Exam / PER — canonical learning and PER workspace
 - Documents — PER evidence notes and supporting information
 - Updates
-- Profile — personal professional information and PER progress summary
+- Profile — personal professional information, including the employee-maintained PER Objective Number
 
 ### Manager
 - Dashboard — personal/team summary and management shortcuts
@@ -41,17 +41,25 @@ A role-based internal professional development portal for TC Professional Servic
 - Updates
 - Profile
 
+## Profile PER Objective Number
+
+Each employee profile contains an **Employee-maintained PER Objective Number** field. The employee can enter or update this reference from their own Profile. Managers and admins cannot edit this field from the employee profile; they can view it when opening an authorised employee record from People/Employees or Team.
+
+This field is deliberately separate from the detailed **PER Objectives** workflow. It is a profile-level reference, while Exam / PER remains the source of truth for objective records, evidence, status and approvals.
+
+The database column is `profiles.per_objective_number` and is nullable so existing employees can leave it blank until they enter their reference.
+
 ## Tab responsibilities
 
 - **Dashboard:** summary and next actions. It owns the high-level overview and must not duplicate the Admin configuration hub.
-- **Team:** operational workforce/progress and actions. Managers see direct reports; admins see active employees.
+- **Team:** operational workforce/progress and actions. Managers see direct reports; admins see active workforce.
 - **People:** source of truth for office people records and people actions.
 - **Approvals:** source of truth for PER approval workflow.
 - **Reports:** analysis, rates, distributions and KPI interpretation.
 - **Admin:** configuration and administration entry points, not another copy of the Dashboard.
 - **Roles & Access:** nested under Admin rather than a separate primary navigation item.
 - **Documents:** currently PER evidence notes; not yet a general-purpose file-management system.
-- **Profile:** personal information plus the employee's PER progress context.
+- **Profile:** personal information and the employee-maintained PER Objective Number. Detailed PER progress remains in Exam / PER.
 
 ## Canonical routes
 
@@ -84,9 +92,9 @@ Legacy routes may remain only for backward-compatible redirects. They must not b
 - Reports links back to Team, People or Approvals when action is required.
 - Profile links to Exam / PER for detailed development work.
 
-## PER and profile information
+## PER source of truth
 
-The portal keeps **22 PER objectives** as the source-of-truth objective total. Employee profiles display approved PER objectives, pending PER submissions and completion percentage. Managers and admins see the same PER summary when viewing an authorised employee profile. Detailed objective records remain in Exam / PER rather than being duplicated in Profile.
+The portal keeps **22 PER objectives** as the source-of-truth objective total. Detailed objective records, evidence, progress and approvals remain in Exam / PER. The profile-level PER Objective Number is only a reference supplied by the employee and is not used as a replacement for the detailed PER records.
 
 ## Departments and controlled options
 
@@ -110,7 +118,8 @@ Navigation is not an authorization boundary. Role-sensitive pages and API handle
 | Admin | — | — | Full |
 | Roles & Access | — | — | Full, under Admin |
 | Updates | Read | Read | Manage where configured |
-| Profile | Own | Own | Own |
+| Profile | Own, including PER Objective Number | Own | Own |
+| Employee profile view | — | Managed employees, read-only PER Objective Number | All authorised people, read-only PER Objective Number |
 
 ## Documents status
 

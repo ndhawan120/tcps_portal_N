@@ -1,0 +1,1 @@
+Employee URL audit: canonical employee detail links should use /employees/{profile_slug}; UUIDs remain supported only for backwards compatibility.

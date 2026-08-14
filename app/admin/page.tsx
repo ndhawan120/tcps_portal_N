@@ -5,7 +5,6 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import AddUserModal from "./AddUserModal";
 import RegistrationApproval from "./RegistrationApproval";
-import PeopleAccess from "./PeopleAccess";
 import RealtimeRefresh from "@/components/RealtimeRefresh";
 
 export default async function AdminPage() {
@@ -23,7 +22,6 @@ export default async function AdminPage() {
   const employeeCount = people.filter((u) => u.role === "employee").length;
   const activeCount = people.filter((u) => u.status === "active").length;
   const pendingUsers = people.filter((u) => u.status === "pending").length;
-  const managers = people.filter((u) => u.role === "manager").map((u) => ({ id: u.id, first_name: u.first_name ?? "", last_name: u.last_name ?? "" }));
 
   const [{ count: pendingPER }, { data: exams }, { data: objectives }] = await Promise.all([
     supabase.from("per_objectives").select("id", { count: "exact", head: true }).eq("status", "pending_approval"),
@@ -52,6 +50,7 @@ export default async function AdminPage() {
   }
 
   const peopleWithLogin = people.map((person) => ({ ...person, last_sign_in_at: lastSignIn[person.id] ?? null }));
+  const managerCount = people.filter((u) => u.role === "manager" && u.status === "active").length;
 
   const departmentStats = Object.entries(
     (exams ?? []).reduce<Record<string, { total: number; passed: number }>>((acc, exam) => {
@@ -73,8 +72,8 @@ export default async function AdminPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-on-surface">User Management</h1>
-            <p className="text-sm text-on-surface-variant mt-1">Manage access, monitor progress and oversee professional development across TC Professional Services.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-on-surface">Admin Dashboard</h1>
+            <p className="text-sm text-on-surface-variant mt-1">Organization-level overview. Use the dedicated People and Team areas for detailed records.</p>
           </div>
           <div className="flex flex-wrap gap-2"><Link href="/employees/export" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant hover:bg-surface-container">Export Data</Link><AddUserModal /></div>
         </div>
@@ -82,7 +81,7 @@ export default async function AdminPage() {
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <AdminStatCard label="Total Employees" value={employeeCount} />
           <AdminStatCard label="Active Employees" value={activeCount} />
-          <AdminStatCard label="Pending Signups" value={pendingUsers} />
+          <AdminStatCard label="Active Managers" value={managerCount} />
           <AdminStatCard label="Pending PER Approvals" value={pendingPER ?? 0} />
         </section>
 
@@ -95,22 +94,18 @@ export default async function AdminPage() {
           </div>
         </section>
 
-        <section className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden mb-6">
-          <div className="px-5 py-4 border-b border-outline-variant"><h2 className="text-lg font-bold text-on-surface">User Management</h2><p className="text-sm text-on-surface-variant mt-1">Search, filter, edit, deactivate and remove users with the same action-focused pattern as the Stitch design.</p></div>
-          <PeopleAccess people={peopleWithLogin} managers={managers} />
-        </section>
-
         <RegistrationApproval />
 
         <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 mt-6">
           <h2 className="text-lg font-bold text-on-surface">Administration</h2>
-          <p className="text-sm text-on-surface-variant mt-1 mb-5">Use the dedicated areas below for access management, branding, approvals and reporting.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            <AdminLink href="/admin/roles" title="Roles & Access" description="Manage roles and departments." primary />
+          <p className="text-sm text-on-surface-variant mt-1 mb-5">Use the dedicated areas below instead of duplicating detailed records on this dashboard.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <AdminLink href="/manager" title="Team" description="View organization-wide team progress and employee status." primary />
+            <AdminLink href="/employees" title="People" description={`Manage ${employeeCount} employees and ${managerCount} active managers.`} />
+            <AdminLink href="/admin/roles" title="Roles & Access" description="Manage roles and departments." />
             <AdminLink href="/admin/branding" title="Branding" description="Upload the TC Professional Services logo." />
-            <AdminLink href="/employees" title="People" description="Search and manage employees and managers." />
             <AdminLink href="/approvals" title={`PER Approvals (${pendingPER ?? 0})`} description="Review submitted PER objectives." />
-            <AdminLink href="/reports" title="Reports" description="View PER and exam reporting." />
+            <AdminLink href="/reports" title="Reports" description="View organization-level reporting." />
           </div>
         </section>
       </main>

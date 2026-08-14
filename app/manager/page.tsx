@@ -9,6 +9,8 @@ import { countPassedExams, TOTAL_EXAMS, TOTAL_OBJECTIVES } from "@/lib/progress"
 const PER_STATUSES = ["not_started", "draft", "pending_approval", "approved", "rejected"];
 const EXAM_STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"];
 const EXAM_RESULTS = ["No Result", "Pass", "Fail", "Exempt"];
+const slugify=(value:string)=>value.toLowerCase().trim().replace(/&/g,"and").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+const employeePath=(member:any)=>`/employees/${member.profile_slug||slugify(`${member.first_name??""} ${member.last_name??""}`)||member.id}`;
 
 export default async function ManagerPage() {
   const supabase = createClient();
@@ -106,7 +108,7 @@ export default async function ManagerPage() {
         <section className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
           <div className="px-5 pt-5 pb-3"><h2 className="text-lg font-bold text-on-surface">{isAdmin ? "All Employees" : "My Team"}</h2></div>
           <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-container text-on-surface-variant text-xs uppercase font-semibold"><tr><th className="text-left px-5 py-3">Name</th><th className="text-left px-5 py-3">PER Progress</th><th className="text-left px-5 py-3">Exams Passed</th><th className="px-5 py-3"></th></tr></thead><tbody className="divide-y divide-outline-variant">
-            {teamMembers.map((member) => { const approved = progressByUser[member.id] ?? 0; const passed = countPassedExams(examsByUser[member.id] ?? []); const pct = Math.round((approved / TOTAL_OBJECTIVES) * 100); return <tr key={member.id}><td className="px-5 py-3 font-medium text-on-surface">{member.first_name} {member.last_name}</td><td className="px-5 py-3 text-on-surface-variant">{approved}/{TOTAL_OBJECTIVES} ({pct}%)</td><td className="px-5 py-3 text-on-surface-variant">{passed}/{TOTAL_EXAMS}</td><td className="px-5 py-3"><Link href={`/employee/${member.id}`} className="text-xs font-medium text-primary hover:underline">View details →</Link></td></tr>; })}
+            {teamMembers.map((member) => { const approved = progressByUser[member.id] ?? 0; const passed = countPassedExams(examsByUser[member.id] ?? []); const pct = Math.round((approved / TOTAL_OBJECTIVES) * 100); return <tr key={member.id}><td className="px-5 py-3 font-medium text-on-surface">{member.first_name} {member.last_name}</td><td className="px-5 py-3 text-on-surface-variant">{approved}/{TOTAL_OBJECTIVES} ({pct}%)</td><td className="px-5 py-3 text-on-surface-variant">{passed}/{TOTAL_EXAMS}</td><td className="px-5 py-3"><Link href={employeePath(member)} className="text-xs font-medium text-primary hover:underline">View details →</Link></td></tr>; })}
             {teamMembers.length === 0 && <tr><td colSpan={4} className="px-5 py-6 text-center text-on-surface-variant">{isAdmin ? "No active employees yet." : "No active direct reports assigned yet."}</td></tr>}
           </tbody></table></div>
         </section>

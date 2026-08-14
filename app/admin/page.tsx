@@ -34,12 +34,34 @@ export default async function AdminPage() {
   const approvedPER = (objectives ?? []).filter((o) => o.status === "approved").length;
   const perCount = (objectives ?? []).length;
   const perApprovalRate = perCount ? Math.round((approvedPER / perCount) * 100) : 0;
+
   let lastSignIn: Record<string, string | null> = {};
   try {
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY; const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (key && url) { const admin = createSupabaseAdmin(url, key, { auth: { autoRefreshToken: false, persistSession: false } }); const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 }); for (const authUser of data.users) lastSignIn[authUser.id] = authUser.last_sign_in_at ?? null; }
-  } catch { lastSignIn = {}; }
-  const departmentStats = Object.entries((exams ?? []).reduce<Record<string, { total: number; passed: number }>>((acc, exam) => { const department = people.find((p) => p.id === exam.user_id)?.department || "Other"; acc[department] ??= { total: 0, passed: 0 }; acc[department].total += 1; if (exam.result === "pass") acc[department].passed += 1; return acc; }, {})).map(([department, value]) => ({ department, rate: value.total ? Math.round((value.passed / value.total) * 100) : 0 })).sort((a, b) => b.rate - a.rate).slice(0, 6));
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (key && url) {
+      const admin = createSupabaseAdmin(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+      const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      for (const authUser of data.users) {
+        lastSignIn[authUser.id] = authUser.last_sign_in_at ?? null;
+      }
+    }
+  } catch {
+    lastSignIn = {};
+  }
+
+  const departmentMap: Record<string, { total: number; passed: number }> = {};
+  for (const exam of exams ?? []) {
+    const department = people.find((p) => p.id === exam.user_id)?.department || "Other";
+    if (!departmentMap[department]) departmentMap[department] = { total: 0, passed: 0 };
+    departmentMap[department].total += 1;
+    if (exam.result === "pass") departmentMap[department].passed += 1;
+  }
+  const departmentStats = Object.entries(departmentMap)
+    .map(([department, value]) => ({ department, rate: value.total ? Math.round((value.passed / value.total) * 100) : 0 }))
+    .sort((a, b) => b.rate - a.rate)
+    .slice(0, 6);
+
   return <div><RealtimeRefresh /><Nav role="admin" name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} /><main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
     <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6"><div><h1 className="text-2xl sm:text-3xl font-bold text-on-surface">Admin Dashboard</h1><p className="text-sm text-on-surface-variant mt-1">Organization-level overview. Use People for the complete office directory and Team for progress management.</p></div><div className="flex flex-wrap gap-2"><Link href="/employees/export" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant hover:bg-surface-container">Export Data</Link><AddUserModal /></div></div>
     <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><AdminStatCard label="Total Members" value={totalMembers} active={activeMembers} /><AdminStatCard label="Total Admins" value={totalAdmins} active={activeAdmins} /><AdminStatCard label="Total Managers" value={totalManagers} active={activeManagers} /><AdminStatCard label="Total Employees" value={totalEmployees} active={activeEmployees} /></section>

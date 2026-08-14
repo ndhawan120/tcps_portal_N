@@ -80,18 +80,12 @@ export default function AnnouncementsList({ announcements, compact = false, curr
             return (
               <div key={a.id} className="p-4 hover:bg-surface-container/40 transition-colors cursor-pointer" onClick={() => setSelected(a)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelected(a); }}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1"><span className={`text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ${isAcca ? "bg-primary/10 text-primary" : "bg-surface-container text-on-surface-variant"}`}>{isAcca ? "ACCA" : "TCPS"}</span></div>
-                    <p className="text-sm font-semibold text-on-surface">{a.title}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {canManage && !compact && <><button onClick={() => setEditing(a)} className="text-xs font-medium text-primary hover:underline">Edit</button>{(canDeleteAny || a.author_id === currentUserId) && <button onClick={() => handleDelete(a.id)} className="text-xs font-medium text-error hover:underline">Delete</button>}</>}
-                    {canManage && compact && (canDeleteAny || a.author_id === currentUserId) && <button onClick={() => handleDelete(a.id)} className="text-xs text-on-surface-variant hover:text-error shrink-0">✕</button>}
-                  </div>
+                  <div className="min-w-0"><div className="flex items-center gap-2 mb-1"><span className={`text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ${isAcca ? "bg-primary/10 text-primary" : "bg-surface-container text-on-surface-variant"}`}>{isAcca ? "ACCA" : "TCPS"}</span></div><p className="text-sm font-semibold text-on-surface">{a.title}</p></div>
+                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>{canManage && !compact && <><button onClick={() => setEditing(a)} className="text-xs font-medium text-primary hover:underline">Edit</button>{(canDeleteAny || a.author_id === currentUserId) && <button onClick={() => handleDelete(a.id)} className="text-xs font-medium text-error hover:underline">Delete</button>}</>}{canManage && compact && (canDeleteAny || a.author_id === currentUserId) && <button onClick={() => handleDelete(a.id)} className="text-xs text-on-surface-variant hover:text-error shrink-0">✕</button>}</div>
                 </div>
                 <div className="relative mt-2 max-h-28 overflow-hidden"><div className="prose prose-sm max-w-none text-on-surface [&_p]:mb-2 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: sanitizeHtml(a.body) }} /><div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-surface-container-lowest to-transparent" /></div>
                 <p className="text-[11px] text-on-surface-variant mt-2">{a.author_name} · {new Date(a.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</p>
-                {isAcca && a.source_url && <a href={a.source_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex text-[11px] text-primary font-semibold mt-2 hover:underline">Read the full announcement on ACCA →</a>}
+                {isAcca && a.source_url ? <a href={a.source_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex text-[11px] text-primary font-semibold mt-2 hover:underline">Read the full announcement on ACCA →</a> : null}
                 {!isAcca && <p className="text-[11px] text-primary font-medium mt-2">Read full update →</p>}
               </div>
             );

@@ -1,0 +1,1 @@
+Backup note: role consistency work should preserve existing production behavior and use the existing backup branches for recovery. No database schema changes are part of this navigation-only pass.

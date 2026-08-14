@@ -32,7 +32,7 @@ export default async function AdminPage() {
 
   const departmentMap: Record<string, { total: number; passed: number }> = {};
   for (const exam of exams ?? []) { const department = people.find((p) => p.id === exam.user_id)?.department || "Other"; if (!departmentMap[department]) departmentMap[department] = { total: 0, passed: 0 }; departmentMap[department].total += 1; if (exam.result === "pass") departmentMap[department].passed += 1; }
-  const departmentStats = Object.entries(departmentMap).map(([department, value]) => ({ department, rate: value.total ? Math.round((value.passed / value.total) * 100) : 0 })).sort((a, b) => b.rate - a.rate).slice(0, 6));
+  const departmentStats = Object.entries(departmentMap).map(([department, value]) => ({ department, rate: value.total ? Math.round((value.passed / value.total) * 100) : 0 })).sort((a, b) => b.rate - a.rate).slice(0, 6);
 
   return <div><RealtimeRefresh /><Nav role="admin" name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`} /><main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
     <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6"><div><h1 className="text-2xl sm:text-3xl font-bold text-on-surface">Admin Dashboard</h1><p className="text-sm text-on-surface-variant mt-1">Organisation summary and the main administrative entry points.</p></div><div className="flex flex-wrap gap-2"><Link href="/employees/export" className="text-sm font-semibold px-4 py-2 rounded-md border border-outline-variant hover:bg-surface-container">Export Data</Link><AddUserModal /></div></div>

@@ -11,8 +11,7 @@ type NavLink = { href: string; label: string; icon: string };
 
 const SHARED_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
-  { href: "/exams", label: "Exams", icon: "menu_book" },
-  { href: "/per-objectives", label: "PER Objectives", icon: "assignment_turned_in" },
+  { href: "/exams", label: "Exam / PER", icon: "menu_book" },
 ];
 
 const FOOTER_LINKS: NavLink[] = [

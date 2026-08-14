@@ -10,7 +10,7 @@ const PER_STATUSES = ["not_started", "draft", "pending_approval", "approved", "r
 const EXAM_STATUSES = ["not_started", "in_progress", "scheduled", "passed", "failed"];
 const EXAM_RESULTS = ["No Result", "Pass", "Fail", "Exempt"];
 const slugify=(value:string)=>value.toLowerCase().trim().replace(/&/g,"and").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
-const employeePath=(member:any)=>`/employees/${member.profile_slug||slugify(`${member.first_name??""} ${member.last_name??""}`)||member.id}`;
+const employeePath=(member:any)=>{const slug=member.profile_slug||slugify(`${member.first_name??""} ${member.last_name??""}`);return slug?`/employees/${slug}`:"/employees";};
 
 export default async function ManagerPage() {
   const supabase = createClient();

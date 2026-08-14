@@ -1,1 +1,0 @@
-Navigation change checkpoint: Exam/PER consolidation requested on 2026-08-14. The canonical navigation will use /exams as the single Exam/PER entry and retain /per-objectives as a compatibility route only. No database changes are intended.

@@ -18,7 +18,19 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
+  const isLegacyEmployeeRoute = path.startsWith("/employee/");
   const isPublic = path === "/login" || path === "/signup" || path === "/forgot-password" || path === "/reset-password" || path.startsWith("/_next") || path.startsWith("/api");
+
+  // The singular /employee/:id route was replaced by /employees/:id.
+  // Preserve old bookmarks and UUID links by redirecting them to the canonical plural route.
+  if (isLegacyEmployeeRoute) {
+    const id = path.slice("/employee/".length);
+    if (id) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/employees/${id}`;
+      return NextResponse.redirect(url, 308);
+    }
+  }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone(); url.pathname = "/login"; return NextResponse.redirect(url);
@@ -32,7 +44,7 @@ export async function middleware(request: NextRequest) {
     }
     const role = profile?.role;
     const adminOnly = path.startsWith("/admin");
-    const managerOnly = path.startsWith("/manager") || path.startsWith("/approvals") || path.startsWith("/employees") || path.startsWith("/employee/");
+    const managerOnly = path.startsWith("/manager") || path.startsWith("/approvals") || path.startsWith("/employees");
     if (adminOnly && role !== "admin") { const url = request.nextUrl.clone(); url.pathname = "/dashboard"; return NextResponse.redirect(url); }
     if (managerOnly && role !== "manager" && role !== "admin") { const url = request.nextUrl.clone(); url.pathname = "/dashboard"; return NextResponse.redirect(url); }
   }

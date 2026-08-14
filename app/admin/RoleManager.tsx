@@ -10,6 +10,8 @@ type Department = { id: string; name: string; slug: string; is_active: boolean }
 const cleanName = (value: string) => value.trim().replace(/[^a-zA-Z0-9 &-]/g, "").replace(/\s+/g, " ").replace(/^[-& ]+|[-& ]+$/g, "");
 const cleanRoleName = (value: string) => value.trim().replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, " ");
 const slugify = (value: string) => value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const normalizeRoleName = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+const isBuiltInRoleName = (value: string) => BASE_ROLES.some((base) => normalizeRoleName(value) === normalizeRoleName(base));
 
 export default function RoleManager() {
   const [roles, setRoles] = useState<CustomRole[]>([]);
@@ -40,6 +42,7 @@ export default function RoleManager() {
   const createRole = async () => {
     const clean = cleanRoleName(roleName);
     if (!clean) return setError("Enter a role name using letters and numbers only.");
+    if (isBuiltInRoleName(clean)) return setError("Employee, Manager and Admin are standard roles. Use a different custom role name.");
     setSaving(true); setError(null);
     const { error: insertError } = await supabase.from("custom_roles").insert({ name: clean, slug: slugify(clean), base_role: baseRole, is_active: true });
     setSaving(false);
@@ -51,6 +54,7 @@ export default function RoleManager() {
   const saveRole = async (role: CustomRole) => {
     const clean = cleanRoleName(editingRoleName);
     if (!clean) return setError("Enter a valid role name.");
+    if (isBuiltInRoleName(clean)) return setError("Employee, Manager and Admin are reserved standard roles. Use a different custom role name.");
     setSaving(true); setError(null);
     const { error: updateError } = await supabase.from("custom_roles").update({ name: clean, slug: slugify(clean), base_role: editingBaseRole }).eq("id", role.id);
     setSaving(false);

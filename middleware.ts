@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+const slugify = (value: string) => value.toLowerCase().trim().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -18,18 +20,37 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isLegacyEmployeeRoute = path.startsWith("/employee/");
+  const isLegacyEmployeeRoute = path === "/employee" || path.startsWith("/employee/");
   const isPublic = path === "/login" || path === "/signup" || path === "/forgot-password" || path === "/reset-password" || path.startsWith("/_next") || path.startsWith("/api");
 
-  // The singular /employee/:id route was replaced by /employees/:id.
-  // Preserve old bookmarks and UUID links by redirecting them to the canonical plural route.
+  // /employees is the only canonical employee-management route. Keep legacy
+  // /employee URLs working, but redirect them directly to the employee slug
+  // rather than chaining through another UUID-based URL.
   if (isLegacyEmployeeRoute) {
-    const id = path.slice("/employee/".length);
-    if (id) {
+    const identifier = path === "/employee" ? "" : path.slice("/employee/".length);
+    if (!identifier) {
       const url = request.nextUrl.clone();
-      url.pathname = `/employees/${id}`;
+      url.pathname = "/employees";
       return NextResponse.redirect(url, 308);
     }
+
+    const { data: employee } = await supabase
+      .from("profiles")
+      .select("id, profile_slug, first_name, last_name")
+      .eq("role", "employee")
+      .or(`id.eq.${identifier},profile_slug.eq.${identifier}`)
+      .maybeSingle();
+
+    const canonicalSlug = employee?.profile_slug || slugify(`${employee?.first_name ?? ""} ${employee?.last_name ?? ""}`);
+    if (canonicalSlug) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/employees/${canonicalSlug}`;
+      return NextResponse.redirect(url, 308);
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = "/employees";
+    return NextResponse.redirect(url, 308);
   }
 
   if (!user && !isPublic) {

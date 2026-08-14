@@ -39,6 +39,7 @@ The repository is a working Next.js application backed by Supabase and deployed 
 - Dashboard
 - Exams
 - PER Objectives
+- Team
 - People
 - Approvals
 - Reports
@@ -46,6 +47,17 @@ The repository is a working Next.js application backed by Supabase and deployed 
 - Roles & Access
 - Updates
 - Profile
+
+### Navigation principles
+
+- **Dashboard** is an action/summary centre, not a duplicate record-management page.
+- **People** is the source of truth for user records and access-related people actions.
+- **Team** is the source of truth for team structure and progress views. Managers see their direct reports; admins see the organisation-wide employee scope.
+- **Approvals** is the source of truth for PER approval workflow.
+- **Reports** is for analysis and KPIs, not another copy of employee records.
+- **Updates** is for announcements and communication.
+- **Admin / Roles & Access** are reserved for system configuration and permissions.
+- Important dashboard cards and summary rows should link to the relevant source page instead of reproducing the full dataset.
 
 The role navigation is defined in `components/Nav.tsx`. Route protection is handled separately by `middleware.ts` and individual sensitive API handlers.
 
@@ -68,7 +80,7 @@ The role navigation is defined in `components/Nav.tsx`. Route protection is hand
 | Dashboard | `/dashboard` | Authenticated |
 | Exams | `/exams` | Authenticated |
 | PER Objectives | `/per-objectives` | Authenticated |
-| Documents | `/documents` | Employee / authenticated users where enabled |
+| Documents | `/documents` | Employee |
 | Updates | `/announcements` | Authenticated |
 | Profile | `/profile` | Authenticated |
 | Team | `/manager` | Manager / Admin |
@@ -79,7 +91,18 @@ The role navigation is defined in `components/Nav.tsx`. Route protection is hand
 | Roles & Access | `/admin/roles` | Admin |
 | Branding | `/admin/branding` | Admin |
 
-Route access is enforced in `middleware.ts` and sensitive API endpoints perform their own server-side authorization checks. UI navigation is not treated as a security boundary.
+The `/manager` route intentionally supports both managers and admins: managers receive their direct-report scope, while admins receive the organisation-wide active-employee scope. The visible navigation label remains **Team** for both roles.
+
+## Internal linking journey
+
+The preferred navigation journey is:
+
+- Employee: `Dashboard → PER Objectives → Documents` when working on evidence, and `Dashboard → Exams` for exam actions.
+- Manager: `Dashboard → Team → Employee detail`, `Dashboard → Approvals → review`, and `Dashboard → Reports` for analysis.
+- Admin: `Dashboard → Team` for organisation-wide people progress, `Dashboard → People` for user management, `Dashboard → Approvals` for workflow, and `Dashboard → Reports` for analysis.
+- Source pages should link onward to the next logical action rather than creating duplicate copies of the same information.
+
+When a route is renamed or moved, update `components/Nav.tsx`, internal `Link` targets, middleware protection, and README route documentation together.
 
 ## Local development
 
@@ -176,8 +199,6 @@ The portal is functional, but these items should not be considered finished:
 - **Admin configuration:** some exam/PER setup can still depend on database-backed configuration rather than a complete admin UI workflow.
 - **Automated route testing:** authenticated smoke tests for employee, manager and admin flows are still needed.
 - **Dependency maintenance:** package upgrades should be handled as deliberate compatibility/security updates followed by `npm run check`.
-- **Navigation consistency:** route names, internal links, middleware rules and role navigation must be updated together whenever a section moves.
-- **Duplicate legacy component:** a root-level `Nav.tsx` exists alongside the canonical `components/Nav.tsx`. The dashboard imports `components/Nav.tsx`; the old root component should be removed after confirming no legacy import depends on it.
 - **Configuration centralization:** totals such as 22 PER objectives and 13 exams should eventually come from one configuration/source rather than being repeated as constants across pages.
 
 ## Repository hygiene

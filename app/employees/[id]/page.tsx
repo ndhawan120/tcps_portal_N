@@ -16,10 +16,15 @@ export default async function EmployeeProfilePage({ params }: PageProps) {
   const { data: viewer } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (!viewer) redirect("/login");
   if (viewer.role !== "admin" && viewer.role !== "manager") redirect("/dashboard");
-  const identifier = decodeURIComponent(params.id);
+
+  const identifier = decodeURIComponent(params.id).trim().toLowerCase();
+  // UUIDs are database identifiers only. They must never be accepted as public
+  // employee profile URLs; profile_slug is the only supported URL identifier.
   const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
-  const { data: employee, error: employeeError } = await supabase.from("profiles").select("*").eq(looksLikeUuid ? "id" : "profile_slug", identifier).single();
-  if (employeeError || !employee) notFound();
+  if (looksLikeUuid) notFound();
+
+  const { data: employee, error: employeeError } = await supabase.from("profiles").select("*").eq("profile_slug", identifier).single();
+  if (employeeError || !employee || !employee.profile_slug) notFound();
   if (viewer.role === "manager" && employee.manager_id !== viewer.id) redirect("/employees");
   const [{ data: objectives }, { data: exams }] = await Promise.all([
     supabase.from("per_objectives").select("id,user_id,objective_number,title,status,evidence_notes,submitted_at,approved_at,approved_by,created_at,updated_at").eq("user_id", employee.id).order("objective_number", { ascending: true }),

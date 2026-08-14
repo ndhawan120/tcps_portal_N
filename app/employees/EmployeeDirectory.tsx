@@ -5,7 +5,7 @@ import RoleSelect from "@/app/admin/RoleSelect";
 import AdminProfileActions from "./AdminProfileActions";
 type Employee={id:string;profile_slug?:string|null;custom_role_id?:string|null;first_name:string|null;last_name:string|null;email:string|null;department:string|null;role:string;status:string;avatar_url:string|null;joining_date?:string|null;approvedPER:number;pendingPER:number;passedExams:number;perProgress:number;examProgress:number};
 const slugify=(value:string)=>value.toLowerCase().trim().replace(/&/g,"and").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
-const employeePath=(employee:Employee)=>`/employees/${employee.profile_slug||slugify(`${employee.first_name??""} ${employee.last_name??""}`)||employee.id}`;
+const employeePath=(employee:Employee)=>{const slug=employee.profile_slug||slugify(`${employee.first_name??""} ${employee.last_name??""}`);return slug?`/employees/${slug}`:"/employees";};
 export default function EmployeeDirectory({employees,isAdmin}:{employees:Employee[];isAdmin:boolean}){
  const [query,setQuery]=useState("");const [role,setRole]=useState("all");const [status,setStatus]=useState("all");const [department,setDepartment]=useState("all");
  const departments=useMemo(()=>Array.from(new Set(employees.map(e=>e.department).filter(Boolean) as string[])).sort(),[employees]);

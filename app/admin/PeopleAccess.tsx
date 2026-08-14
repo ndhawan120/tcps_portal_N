@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import RoleSelect from "./RoleSelect";
 import DepartmentSelect from "./DepartmentSelect";
 import StatusSelect from "./StatusSelect";
-import ManagerSelect from "./ManagerSelect";
 
 type Person = {
   id: string;
@@ -117,7 +116,7 @@ export default function PeopleAccess({ people, managers }: { people: Person[]; m
             <td className="px-5 py-3"><RoleSelect userId={person.id} currentRole={person.role} currentCustomRoleId={person.custom_role_id} /></td>
             <td className="px-5 py-3"><StatusSelect userId={person.id} currentStatus={person.status} /></td>
             <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">{person.last_sign_in_at ? new Date(person.last_sign_in_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "Never"}</td>
-            <td className="px-5 py-3"><div className="flex justify-end gap-1 opacity-80 group-hover:opacity-100"><button type="button" onClick={() => setEditing(person)} className="p-2 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary" title="Edit user" aria-label="Edit user">✎</button><button type="button" onClick={() => setDeleting(person)} className="p-2 rounded-md hover:bg-error-container text-on-surface-variant hover:text-error disabled:opacity-40" title="Delete user" aria-label="Delete user" disabled={person.role === "admin"}>×</button><Link href={`/employees/${person.profile_slug || person.id}`} className="p-2 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary" title="View profile" aria-label="View profile">↗</Link></div></td>
+            <td className="px-5 py-3"><div className="flex justify-end gap-1 opacity-80 group-hover:opacity-100"><button type="button" onClick={() => setEditing(person)} className="p-2 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary" title="Edit user" aria-label="Edit user">✎</button><button type="button" onClick={() => setDeleting(person)} className="p-2 rounded-md hover:bg-error-container text-on-surface-variant hover:text-error disabled:opacity-40" title="Delete user" aria-label="Delete user" disabled={person.role === "admin"}>×</button>{person.profile_slug ? <Link href={`/employees/${person.profile_slug}`} className="p-2 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary" title="View profile" aria-label="View profile">↗</Link> : null}</div></td>
           </tr>)}</tbody>
         </table>
       </div>

@@ -11,7 +11,6 @@ type NavLink = { href: string; label: string; icon: string };
 
 const SHARED_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
-  { href: "/exams", label: "Exam / PER", icon: "menu_book" },
 ];
 const FOOTER_LINKS: NavLink[] = [
   { href: "/announcements", label: "Updates", icon: "campaign" },
@@ -35,8 +34,8 @@ export default function Nav({ role, name }: { role: string; name: string }) {
       { href: "/admin", label: "Admin", icon: "admin_panel_settings" },
       ...FOOTER_LINKS,
     ];
-    if (role === "manager") return [...SHARED_LINKS, { href: "/team", label: "Team", icon: "groups" }, { href: "/approvals", label: "Approvals", icon: "fact_check" }, { href: "/reports", label: "Reports", icon: "assessment" }, ...FOOTER_LINKS];
-    return [...SHARED_LINKS, { href: "/documents", label: "Documents", icon: "description" }, ...FOOTER_LINKS];
+    if (role === "manager") return [...SHARED_LINKS, { href: "/exams", label: "Exam / PER", icon: "menu_book" }, { href: "/team", label: "Team", icon: "groups" }, { href: "/approvals", label: "Approvals", icon: "fact_check" }, { href: "/reports", label: "Reports", icon: "assessment" }, ...FOOTER_LINKS];
+    return [...SHARED_LINKS, { href: "/exams", label: "Exam / PER", icon: "menu_book" }, { href: "/documents", label: "Documents", icon: "description" }, ...FOOTER_LINKS];
   }, [role]);
 
   const adminSubLinks: NavLink[] = [
@@ -59,6 +58,6 @@ export default function Nav({ role, name }: { role: string; name: string }) {
     <div className="lg:hidden sticky top-0 z-50 bg-[#191919] text-white px-4 py-3 flex items-center justify-between"><Link href="/dashboard" className="font-extrabold text-primary">TCPS</Link><div className="flex items-center gap-2"><NotificationBell /><button type="button" aria-label="Toggle navigation" onClick={() => setMobileOpen(v => !v)} className="h-9 w-9 border border-white/15 rounded-md">{mobileOpen ? "×" : "☰"}</button></div></div>
     {mobileOpen && <div className="lg:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setMobileOpen(false)} />}
     <div className={`lg:hidden fixed left-0 right-0 top-[60px] z-50 bg-[#191919] px-3 pb-4 pt-3 shadow-xl ${mobileOpen ? "block" : "hidden"}`}><nav className="space-y-1">{navContent}<button type="button" onClick={logout} className="w-full rounded-md px-3 py-3 text-left text-sm font-semibold text-white/70">Log out</button></nav></div>
-    <header className="hidden lg:flex fixed top-0 left-64 right-0 z-40 h-[68px] bg-[#fafafa] border-b border-[#e7bdb2] items-center justify-between px-10"><form onSubmit={submitSearch} className="w-full max-w-xl rounded-xl bg-[#f0f0f0] px-4 py-2.5 flex items-center gap-3"><span className="material-symbols-outlined text-[#6b6b6b] text-[21px]" aria-hidden="true">search</span><input value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-transparent border-0 outline-none text-sm" placeholder="Search exams or documents..." aria-label="Search exams or documents" /></form><div className="flex items-center gap-6 ml-6"><NotificationBell /><Link href="/profile" className="border-l border-[#e7bdb2] pl-6 text-sm font-semibold text-primary">Update Profile</Link></div></header>
+    <header className="hidden lg:flex fixed top-0 left-64 right-0 z-40 h-[68px] bg-[#fafafa] border-b border-[#e2e2e2] items-center justify-between px-10"><form onSubmit={submitSearch} className="w-full max-w-xl rounded-xl bg-[#f0f0f0] px-4 py-2.5 flex items-center gap-3"><span className="material-symbols-outlined text-[#6b6b6b] text-[21px]" aria-hidden="true">search</span><input value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-transparent border-0 outline-none text-sm" placeholder="Search exams or documents..." aria-label="Search exams or documents" /></form><div className="flex items-center gap-6 ml-6"><NotificationBell /><Link href="/profile" className="border-l border-[#e2e2e2] pl-6 text-sm font-semibold text-primary">Update Profile</Link></div></header>
   </>;
 }

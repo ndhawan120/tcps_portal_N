@@ -27,15 +27,27 @@ export default function LoginForm() {
   }, [supabase]);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); setLoading(true); setError(null);
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-    if (loginError) { setLoading(false); setError(loginError.message); return; }
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    if (loginError) {
+      setLoading(false);
+      const message = loginError.message.toLowerCase();
+      setError(message.includes("invalid login credentials") || message.includes("invalid credentials")
+        ? "Email or password is incorrect. If you recently received approval, use the password you created during signup. If you do not remember it, use Forgot password? to create a new one."
+        : loginError.message);
+      return;
+    }
     if (!data.user) { setLoading(false); setError("Unable to authenticate."); return; }
     const { data: profile, error: profileError } = await supabase.from("profiles").select("status, role").eq("id", data.user.id).single();
     if (profileError) { await supabase.auth.signOut(); setLoading(false); setError("Your account profile could not be loaded. Please contact an administrator."); return; }
     if (["pending", "rejected", "inactive"].includes(profile.status)) { await supabase.auth.signOut(); setLoading(false); router.push(`/login?error=account_${profile.status}`); router.refresh(); return; }
     await supabase.from("profiles").update({ last_login: new Date().toISOString() }).eq("id", data.user.id);
-    setLoading(false); router.push("/dashboard"); router.refresh();
+    setLoading(false);
+    router.push("/dashboard");
+    router.refresh();
   };
 
   return (
@@ -49,13 +61,10 @@ export default function LoginForm() {
             <p className="mt-6 text-sm leading-6 text-white/70 max-w-md">Access your professional development, objectives, exams, approvals and company updates in one place.</p>
           </div>
         </section>
-
         <section className="flex items-center justify-center p-6 sm:p-10 lg:p-16">
           <div className="w-full max-w-md mx-auto">
             <div className="mb-8 text-center">
-              <div className="lg:hidden mb-8 flex justify-center">
-                <img src={logoUrl} alt="TC Professional Services" className="h-20 w-auto max-w-[320px] object-contain" />
-              </div>
+              <div className="lg:hidden mb-8 flex justify-center"><img src={logoUrl} alt="TC Professional Services" className="h-20 w-auto max-w-[320px] object-contain" /></div>
               <h2 className="text-2xl font-extrabold text-on-surface">Welcome back</h2>
               <p className="mt-2 text-sm text-on-surface-variant">Sign in to your professional development portal.</p>
             </div>
@@ -65,7 +74,7 @@ export default function LoginForm() {
             <form onSubmit={handleLogin} className="space-y-4">
               <div><label className="block text-sm font-medium text-on-surface mb-1">Email</label><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-md border border-outline-variant bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" /></div>
               <div><div className="flex items-center justify-between mb-1"><label className="block text-sm font-medium text-on-surface">Password</label><a href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</a></div><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-md border border-outline-variant bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" /></div>
-              {error && <p className="text-sm text-error text-center">{error}</p>}
+              {error && <div className="text-sm text-error bg-error-container/30 border border-error/20 rounded-md px-3 py-2.5 text-center"><p>{error}</p><a href="/forgot-password" className="inline-block mt-1 font-semibold text-primary hover:underline">Reset your password</a></div>}
               <button type="submit" disabled={loading} className="w-full bg-primary text-on-primary rounded-md py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50">{loading ? "Signing in..." : "Sign in"}</button>
             </form>
             <p className="text-sm text-on-surface-variant mt-5 text-center">Don&apos;t have an account? <a href="/signup" className="text-primary font-medium hover:underline">Sign up</a></p>

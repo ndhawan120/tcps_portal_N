@@ -17,10 +17,11 @@ export default function DirectEvidenceUpload({ objectiveId, userId, currentUrl }
       const path = `${userId}/${objectiveId}/${Date.now()}-${safeName}`;
       const { error: uploadError } = await supabase.storage.from("per-evidence").upload(path, file, { upsert: false });
       if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from("per-evidence").getPublicUrl(path);
-      const { error: dbError } = await supabase.from("per_objectives").update({ evidence_file_url: data.publicUrl }).eq("id", objectiveId).eq("user_id", userId);
+      const { data: signed, error: signedError } = await supabase.storage.from("per-evidence").createSignedUrl(path, 60 * 60 * 24 * 7);
+      if (signedError || !signed?.signedUrl) throw signedError ?? new Error("Unable to create a secure document link.");
+      const { error: dbError } = await supabase.from("per_objectives").update({ evidence_file_url: path }).eq("id", objectiveId).eq("user_id", userId);
       if (dbError) throw dbError;
-      setUrl(data.publicUrl); setMessage("Document uploaded.");
+      setUrl(signed.signedUrl); setMessage("Document uploaded securely.");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to upload document."); }
     finally { setUploading(false); }
   };

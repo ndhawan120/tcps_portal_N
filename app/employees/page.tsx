@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
 import RealtimeRefresh from "@/components/RealtimeRefresh";
 import EmployeeDirectory from "./EmployeeDirectory";
+import RegistrationApproval from "@/app/admin/RegistrationApproval";
 import { countPassedExams, TOTAL_EXAMS, TOTAL_OBJECTIVES } from "@/lib/progress";
 
 export default async function EmployeesPage() {
@@ -56,6 +57,7 @@ export default async function EmployeesPage() {
 
   return <div><RealtimeRefresh /><Nav role={profile.role} name={`${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim()} /><main className="max-w-7xl mx-auto px-6 py-8">
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8"><div><h1 className="text-2xl font-bold text-on-surface">{profile.role === "admin" ? "People" : "Employees"}</h1><p className="text-sm text-on-surface-variant mt-1">{profile.role === "admin" ? "View every employee, manager, and admin in the office." : "View only your immediate team and their progress."}</p></div><a href="/employees/export" className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-primary text-on-primary text-sm font-semibold hover:opacity-90">Download Excel</a></div>
+    {profile.role === "admin" && <div className="mb-8"><RegistrationApproval /></div>}
     {profile.role === "admin" ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <StatCard label="Total Members" value={totalMembers} active={activeMembers} activeLabel="Active" />
       <StatCard label="Total Admins" value={totalAdmins} active={activeAdmins} activeLabel="Active" />
